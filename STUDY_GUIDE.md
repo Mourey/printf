@@ -1,143 +1,122 @@
-# ft_printf Study Guide
+# Building ft_printf: A Step-by-Step Implementation Tutorial
 
-A comprehensive documentation of the ft_printf implementation.
-
----
-
-## Table of Contents
-
-1. [Overview](#1-overview)
-2. [Architecture](#2-architecture)
-3. [Parsing Logic](#3-parsing-logic)
-4. [Core Algorithms](#4-core-algorithms)
-5. [Specifier Deep Dives](#5-specifier-deep-dives)
-6. [Flag Interaction Matrix](#6-flag-interaction-matrix)
-7. [Precision vs Width](#7-precision-vs-width)
-8. [Common Edge Cases](#8-common-edge-cases)
-9. [Code Walkthrough Examples](#9-code-walkthrough-examples)
-10. [Practice Exercises](#10-practice-exercises)
+This guide walks you through building a complete `ft_printf` implementation from scratch. Rather than presenting the code as a reference, we will follow the natural order you would create each file, explaining the reasoning behind every decision along the way. By the end, you will understand not just what the code does, but why it is written that way.
 
 ---
 
-## 1. Overview
+## Introduction
 
-### What is ft_printf?
+The `printf` function is one of the most commonly used functions in C, yet its implementation presents a fascinating challenge. At first glance, it seems straightforward: parse a format string and print the appropriate values. However, the complexity emerges when you consider all the formatting options—flags, width, precision—and how they interact differently for each type of data. A character handles width completely differently than a number, and numbers themselves behave differently depending on whether they are signed, unsigned, or hexadecimal.
 
-`ft_printf` is a custom implementation of the standard C library's `printf` function. It writes formatted output to stdout, supporting various format specifiers, flags, width, and precision options.
-
-### Format String Syntax
-
-```
-%[flags][width][.precision]specifier
-```
-
-| Component    | Description                                                  | Example |
-| ------------ | ------------------------------------------------------------ | ------- |
-| `%`          | Format specifier start                                       | `%d`    |
-| `flags`      | Optional modifiers: `-`, `0`, `#`, ` `, `+`                  | `%-5d`  |
-| `width`      | Minimum field width (decimal number)                         | `%10s`  |
-| `.precision` | Precision (dot followed by decimal number)                   | `%.3f`  |
-| `specifier`  | Conversion type: `c`, `s`, `p`, `d`, `i`, `u`, `x`, `X`, `%` | `%s`    |
-
-### Return Value
-
-`ft_printf` returns the total number of characters printed (excluding the null terminator). Returns `-1` if the format string is NULL.
+Our implementation strategy is to build the project in layers, starting with the foundation and working up to the complete function. We begin with the header file that defines our data structures, then create utility functions that every handler will need, followed by the parser that understands format strings, and finally the handlers for each specifier type. This order ensures that when we write each piece, everything it depends on already exists.
 
 ---
 
-## 2. Architecture
+## Step 1: The Header File (ft_printf.h)
 
-### File Structure
+Every C project of reasonable complexity needs a header file, and for ft_printf, this header serves as the architectural blueprint for the entire implementation. We create it first because every other file will include it, and we need to establish our data structures before we can write functions that use them.
 
-# TODO FILE STRUCTURE
+### Designing the t_fmt Structure
 
-### The t_fmt Structure
+The heart of our header is the `t_fmt` structure, which holds all the information parsed from a format specifier. When we encounter something like `%+08.5d` in a format string, we need somewhere to store the fact that the plus flag is set, zero-padding is requested, the width is 8, the precision is 5, and the specifier is 'd'. Rather than passing all these values as separate parameters to every function, we bundle them into a single structure.
 
-The `t_fmt` structure stores all parsed format information:
+Each field in the structure corresponds to something that can appear in a format specifier. The `minus`, `zero`, `hash`, `space`, and `plus` fields are simple boolean flags—they are either set or not. We use `int` rather than `bool` for 42 School norm compliance and because the values 0 and 1 work perfectly well as false and true. The `width` field stores the minimum field width as an integer, and the `specifier` field stores the conversion character that tells us what type of argument to expect.
+
+The `precision` field deserves special attention. We initialize it to -1, not 0, because we need to distinguish between "precision was not specified" and "precision was explicitly set to zero." This distinction matters enormously: when printing the number 0 with `%.0d`, we print nothing (the precision of 0 means zero digits minimum, and zero requires zero digits), but with `%d` we print "0" because no precision constraint was given. If we initialized precision to 0, we could not tell these cases apart.
+
+### The Complete Header
 
 ```c
+#ifndef FT_PRINTF_H
+# define FT_PRINTF_H
+
+# include "libft/libft.h"
+# include <stdarg.h>
+
 typedef struct s_fmt
 {
-    int     minus;      // '-' flag: left-align output
-    int     zero;       // '0' flag: zero-pad numbers
-    int     hash;       // '#' flag: alternate form (0x prefix for hex)
-    int     space;      // ' ' flag: space before positive numbers
-    int     plus;       // '+' flag: always show sign
-    int     width;      // Minimum field width
-    int     precision;  // Precision (-1 if not specified)
-    char    specifier;  // Conversion character (c, s, p, d, i, u, x, X, %)
+    int     minus;
+    int     zero;
+    int     hash;
+    int     space;
+    int     plus;
+    int     width;
+    int     precision;
+    char    specifier;
 }   t_fmt;
+
+int     ft_printf(const char *format, ...);
+int     ft_parse_format(const char *fmt, int *i, t_fmt *spec);
+int     ft_print_char(char c, t_fmt *spec);
+int     ft_print_str(char *s, t_fmt *spec);
+int     ft_print_ptr(void *ptr, t_fmt *spec);
+int     ft_print_nbr(int n, t_fmt *spec);
+int     ft_print_unsigned(unsigned int n, t_fmt *spec);
+int     ft_print_hex(unsigned int n, t_fmt *spec);
+int     ft_putchar_count(char c);
+int     ft_print_padding(int n, char c);
+
+#endif
 ```
 
-**Field Details:**
-
-| Field       | Type | Default | Purpose                                     |
-| ----------- | ---- | ------- | ------------------------------------------- |
-| `minus`     | int  | 0       | Left-align within field width               |
-| `zero`      | int  | 0       | Pad with zeros instead of spaces            |
-| `hash`      | int  | 0       | Alternate form (adds 0x for hex)            |
-| `space`     | int  | 0       | Add space for positive numbers              |
-| `plus`      | int  | 0       | Always show + or - sign                     |
-| `width`     | int  | 0       | Minimum characters to output                |
-| `precision` | int  | -1      | Min digits (numbers) or max chars (strings) |
-| `specifier` | char | 0       | The conversion character                    |
-
-### Function Call Flow
-
-```
-ft_printf(format, ...)
-    │
-    ├─► Iterate through format string
-    │       │
-    │       ├─► '%' found
-    │       │       │
-    │       │       └─► ft_parse_format()
-    │       │               ├─► ft_init_spec()
-    │       │               ├─► ft_parse_flags()
-    │       │               ├─► ft_parse_width()
-    │       │               └─► ft_parse_precision()
-    │       │
-    │       └─► ft_dispatch()
-    │               │
-    │               ├─► 'c' → ft_print_char()
-    │               ├─► 's' → ft_print_str()
-    │               ├─► 'p' → ft_print_ptr()
-    │               ├─► 'd'/'i' → ft_print_nbr()
-    │               ├─► 'u' → ft_print_unsigned()
-    │               ├─► 'x'/'X' → ft_print_hex()
-    │               └─► '%' → ft_print_char('%')
-    │
-    └─► Return total character count
-```
+Notice that we include both our own libft library (for utility functions like `ft_strlen` and `ft_strchr`) and the standard `<stdarg.h>` header (for variadic argument handling). The function declarations follow a consistent pattern: every printing function returns an `int` representing the number of characters printed. This is essential because `ft_printf` itself must return the total character count, so every component must track its contribution.
 
 ---
 
-## 3. Parsing Logic
+## Step 2: Utility Functions (ft_print_utils.c)
 
-### ft_parse_format.c Overview
+Before we can build any of the format handlers, we need two fundamental operations that appear everywhere: printing a single character and printing repeated padding characters. These utilities are so basic that every handler depends on them, which is why we create them second.
 
-The parser processes the format string sequentially after encountering `%`:
+### The Foundation: ft_putchar_count
+
+The `ft_putchar_count` function does exactly what its name suggests—it writes a single character to standard output and returns 1. You might wonder why we bother wrapping `write` in a function that always returns 1. The answer is consistency and chainability. Every printing operation in our implementation needs to contribute to a running count, and by having even the smallest operation return its count, we can write clean code like `count += ft_putchar_count(c)` everywhere.
 
 ```c
-int ft_parse_format(const char *fmt, int *i, t_fmt *spec)
+int ft_putchar_count(char c)
 {
-    ft_init_spec(spec);           // 1. Initialize all fields
-    (*i)++;                        // 2. Skip '%'
-    ft_parse_flags(fmt, i, spec); // 3. Parse flags
-    ft_parse_width(fmt, i, spec); // 4. Parse width
-    ft_parse_precision(fmt, i, spec); // 5. Parse precision
-    if (fmt[*i] && ft_strchr("cspdiuxX%", fmt[*i]))
-    {
-        spec->specifier = fmt[*i];
-        return (1);  // Valid specifier found
-    }
-    return (0);  // Invalid specifier
+    write(1, &c, 1);
+    return (1);
 }
 ```
 
-### Initialization
+This function is the atom from which all output is built. Every character that ft_printf produces ultimately passes through this function.
 
-All fields are reset to default values:
+### Reusable Padding: ft_print_padding
+
+Almost every format specifier needs to handle padding—filling space with characters to meet a minimum width. Rather than duplicating this logic in every handler, we create a single function that prints `n` copies of character `c`.
+
+```c
+int ft_print_padding(int n, char c)
+{
+    int count;
+
+    count = 0;
+    while (n > 0)
+    {
+        count += ft_putchar_count(c);
+        n--;
+    }
+    return (count);
+}
+```
+
+A subtle but important detail: the loop condition is `n > 0`, which means if `n` is zero or negative, nothing is printed and zero is returned. This graceful handling of edge cases means callers do not need to check whether padding is actually needed before calling this function. You can always call `ft_print_padding(width - content_length, ' ')` and if the content already exceeds the width, it simply does nothing. This eliminates a class of bugs where forgetting to check for negative padding values would cause problems.
+
+---
+
+## Step 3: The Parser (ft_parse_format.c)
+
+Before we can print anything formatted, we need to understand what formatting is requested. The parser's job is to take a format string like `%-10.5d` and extract all the information into our `t_fmt` structure. We build the parser before the handlers because the handlers need parsed data to work with.
+
+### Understanding Format String Structure
+
+A format specifier in printf follows a strict grammar: `%[flags][width][.precision]specifier`. The percent sign starts it, then come optional flags (which can appear in any order), an optional width (a decimal number), an optional precision (a dot followed by a decimal number), and finally a required specifier character that determines the argument type.
+
+The parser must handle this grammar correctly, and the order of parsing matters. We must parse flags before width because a leading zero could be either the zero flag or the start of a width number. The rule is that zeros immediately after `%` (or after other flags) are the zero flag, while digits that form a number are the width. By parsing flags first and consuming all flag characters, any digits we then encounter must be width digits.
+
+### Initialization: Why -1 for Precision
+
+The `ft_init_spec` function resets all fields to their default values at the start of parsing each format specifier. Most fields default to 0, meaning the flag is not set or the value is not specified. But precision defaults to -1, and this choice is critical.
 
 ```c
 static void ft_init_spec(t_fmt *spec)
@@ -148,16 +127,16 @@ static void ft_init_spec(t_fmt *spec)
     spec->space = 0;
     spec->plus = 0;
     spec->width = 0;
-    spec->precision = -1;  // -1 means "not specified"
+    spec->precision = -1;
     spec->specifier = 0;
 }
 ```
 
-**Key Point:** `precision = -1` indicates precision was not specified, which affects zero-padding behavior.
+The value -1 serves as a sentinel meaning "precision was not specified in the format string." This is different from precision being explicitly set to 0 with `%.0d`. The distinction affects multiple behaviors: whether zero-padding with the `0` flag is allowed (precision disables it), how to handle printing the value 0 (with precision 0, nothing is printed), and more. Without this sentinel value, we could not implement these behaviors correctly.
 
-### Flag Parsing
+### Parsing Flags
 
-Flags can appear in any order and are parsed until a non-flag character:
+Flags can appear in any order and even be repeated (though repetition has no additional effect). The parser uses `ft_strchr` to check if the current character is one of the five valid flags, and if so, sets the appropriate field and advances to the next character.
 
 ```c
 static void ft_parse_flags(const char *fmt, int *i, t_fmt *spec)
@@ -179,9 +158,11 @@ static void ft_parse_flags(const char *fmt, int *i, t_fmt *spec)
 }
 ```
 
-### Width Parsing
+The while loop continues as long as the current character is a valid flag. This handles cases like `%-0+` where multiple flags appear consecutively. Once a non-flag character is encountered, the loop exits and parsing continues with width.
 
-Width is accumulated from consecutive digits:
+### Parsing Width with Horner's Method
+
+Width is a decimal number, and we need to convert the sequence of digit characters into an integer value. The classic technique is Horner's method, which builds the number digit by digit: multiply the current value by 10 and add the new digit.
 
 ```c
 static void ft_parse_width(const char *fmt, int *i, t_fmt *spec)
@@ -194,11 +175,11 @@ static void ft_parse_width(const char *fmt, int *i, t_fmt *spec)
 }
 ```
 
-**Algorithm:** Horner's method - `width = width * 10 + digit`
+For example, parsing "123" proceeds as: start with 0, then 0×10+1=1, then 1×10+2=12, then 12×10+3=123. This handles numbers of any length naturally. If no digits are present, the loop never executes and width remains at its default of 0.
 
-### Precision Parsing
+### Parsing Precision: The Dot Trigger
 
-Precision is triggered by `.` and defaults to 0 if no digits follow:
+Precision parsing is triggered by a dot character. If there is no dot, precision remains at -1 (unspecified). If a dot is present, precision is set to 0 immediately (meaning "precision was specified") and then digits are accumulated just like for width.
 
 ```c
 static void ft_parse_precision(const char *fmt, int *i, t_fmt *spec)
@@ -206,7 +187,7 @@ static void ft_parse_precision(const char *fmt, int *i, t_fmt *spec)
     if (fmt[*i] == '.')
     {
         (*i)++;
-        spec->precision = 0;  // Mark as specified
+        spec->precision = 0;
         while (fmt[*i] && ft_isdigit(fmt[*i]))
         {
             spec->precision = spec->precision * 10 + (fmt[*i] - '0');
@@ -216,685 +197,797 @@ static void ft_parse_precision(const char *fmt, int *i, t_fmt *spec)
 }
 ```
 
-**Key Point:** `%.d` and `%.0d` are equivalent (precision = 0).
+This means `%.d` and `%.0d` are equivalent—both set precision to 0. The dot alone is enough to indicate that precision was specified, even if no digits follow. This matches the behavior of the standard printf.
+
+### The Complete Parser
+
+```c
+int ft_parse_format(const char *fmt, int *i, t_fmt *spec)
+{
+    ft_init_spec(spec);
+    (*i)++;
+    ft_parse_flags(fmt, i, spec);
+    ft_parse_width(fmt, i, spec);
+    ft_parse_precision(fmt, i, spec);
+    if (fmt[*i] && ft_strchr("cspdiuxX%", fmt[*i]))
+    {
+        spec->specifier = fmt[*i];
+        return (1);
+    }
+    return (0);
+}
+```
+
+The main parsing function orchestrates all the pieces. It increments `i` past the `%` character, calls each parsing helper in order, and then checks if the current character is a valid specifier. If so, it stores the specifier and returns 1 to indicate success. If the specifier is invalid or missing, it returns 0 and the caller can decide how to handle the error.
 
 ---
 
-## 4. Core Algorithms
+## Step 4: Character Handler (ft_print_char.c)
 
-### Padding Algorithm
+With our utilities and parser in place, we can start building the format handlers. We begin with `%c` because it is the simplest specifier, yet it establishes the fundamental two-path rendering pattern that all handlers follow.
 
-The `ft_print_padding` function outputs `n` copies of character `c`:
+### The Two-Path Pattern
+
+Every handler that supports width must handle two cases: left-alignment (when the minus flag is set) and right-alignment (the default). For left-alignment, we print the content first and then add padding. For right-alignment, we print padding first and then the content. This pattern is so fundamental that we will see it repeated in every handler.
 
 ```c
-int ft_print_padding(int n, char c)
+int ft_print_char(char c, t_fmt *spec)
 {
-    int count = 0;
-    while (n > 0)
+    int count;
+
+    count = 0;
+    if (spec->minus)
     {
         count += ft_putchar_count(c);
-        n--;
+        count += ft_print_padding(spec->width - 1, ' ');
+    }
+    else
+    {
+        count += ft_print_padding(spec->width - 1, ' ');
+        count += ft_putchar_count(c);
     }
     return (count);
 }
 ```
 
-**Edge Case:** If `n <= 0`, no characters are printed.
+### Why Width - 1
 
-### Recursive Digit Printing
+Notice that the padding amount is `spec->width - 1`. The width specifies the minimum total field width, and the character itself occupies 1 position. So if the width is 5, we need 4 characters of padding plus the 1 character of content to make 5 total. If width is 0 (not specified), then `width - 1` is -1, and as we discussed earlier, `ft_print_padding` gracefully handles negative values by printing nothing.
 
-Numbers are printed most-significant-digit first using recursion:
+This function also demonstrates that `%c` ignores most flags. The zero flag has no effect (characters are always space-padded), and hash, space, and plus are meaningless for characters. Only the minus flag and width apply.
+
+---
+
+## Step 5: String Handler (ft_print_str.c)
+
+The string handler builds directly on the character handler's foundation but adds two significant complications: NULL handling and precision truncation. This is the natural progression—we understand the simple case with characters, then add complexity for strings.
+
+### NULL Handling Decision
+
+What should happen when someone passes NULL to `%s`? The standard does not define this behavior—it is undefined. But being helpful is better than crashing, so our implementation prints the literal string "(null)" when given a NULL pointer. This matches the behavior of many printf implementations and provides useful debugging information.
 
 ```c
-static int ft_print_digits(long n)
+if (!s)
+    s = "(null)";
+```
+
+This single line transforms a potentially dangerous NULL pointer into a safe, printable string. All subsequent code can assume `s` is a valid pointer.
+
+### Precision as Maximum Length
+
+For strings, precision means something completely different than for numbers. With strings, precision specifies the maximum number of characters to print. If the string is longer than the precision, it gets truncated. If it is shorter, precision has no effect—it does not add padding.
+
+```c
+len = ft_strlen(s);
+print_len = len;
+if (spec->precision >= 0 && spec->precision < len)
+    print_len = spec->precision;
+```
+
+The condition `spec->precision >= 0` checks whether precision was specified (remember, -1 means unspecified). If precision is specified and is less than the string length, we use the precision as our print length. Otherwise, we print the entire string.
+
+### A Helper for Controlled Output
+
+Since we might not print the entire string, we cannot simply use a function like `ft_putstr`. We need a helper that prints exactly `len` characters:
+
+```c
+static int ft_print_str_content(char *s, int len)
 {
-    int count = 0;
-    if (n >= 10)
-        count += ft_print_digits(n / 10);  // Recurse for higher digits
-    count += ft_putchar_count('0' + (n % 10));  // Print current digit
+    int count;
+    int i;
+
+    count = 0;
+    i = 0;
+    while (i < len)
+    {
+        count += ft_putchar_count(s[i]);
+        i++;
+    }
     return (count);
 }
 ```
 
-**Why Recursion?**
-
-- Digits are extracted right-to-left (42 % 10 = 2, 42 / 10 = 4)
-- But we need to print left-to-right (4, then 2)
-- Recursion naturally reverses the order via the call stack
-
-**Example: Printing 123**
-
-```
-ft_print_digits(123)
-  └─► ft_print_digits(12)
-        └─► ft_print_digits(1)
-              └─► print '1', return
-        └─► print '2', return
-  └─► print '3', return
-Output: "123"
-```
-
-### Precision for Numbers
-
-Precision specifies minimum digits, adding leading zeros if needed:
+### The Complete String Handler
 
 ```c
-int digit_len = ft_num_len(n);       // Actual digits
-int num_len = digit_len;
-if (spec->precision > digit_len)
-    num_len = spec->precision;       // Pad with leading zeros
-
-// Print leading zeros
-ft_print_padding(num_len - digit_len, '0');
-```
-
-**Example:** `%.5d` with value `42`:
-
-- `digit_len = 2`, `precision = 5`
-- `num_len = 5`, leading zeros = 3
-- Output: `00042`
-
-### Width & Alignment: Three Rendering Paths
-
-Number handlers use three distinct rendering paths:
-
-```c
-// Determine pad character
-char pad = ' ';
-if (spec->zero && !spec->minus && spec->precision < 0)
-    pad = '0';
-
-// PATH 1: Left-align (minus flag)
-if (spec->minus)
+int ft_print_str(char *s, t_fmt *spec)
 {
-    // [sign][precision zeros][digits][space padding]
-}
-// PATH 2: Zero-padding
-else if (pad == '0')
-{
-    // [sign][zero padding][precision zeros][digits]
-}
-// PATH 3: Space-padding (default)
-else
-{
-    // [space padding][sign][precision zeros][digits]
+    int count;
+    int len;
+    int print_len;
+
+    count = 0;
+    if (!s)
+        s = "(null)";
+    len = ft_strlen(s);
+    print_len = len;
+    if (spec->precision >= 0 && spec->precision < len)
+        print_len = spec->precision;
+    if (spec->minus)
+    {
+        count += ft_print_str_content(s, print_len);
+        count += ft_print_padding(spec->width - print_len, ' ');
+    }
+    else
+    {
+        count += ft_print_padding(spec->width - print_len, ' ');
+        count += ft_print_str_content(s, print_len);
+    }
+    return (count);
 }
 ```
 
-**Path Summary:**
-
-| Path       | Condition                             | Order                          |
-| ---------- | ------------------------------------- | ------------------------------ |
-| Left-align | `minus` flag set                      | content → padding              |
-| Zero-pad   | `zero` flag, no `minus`, no precision | sign → zeros → digits          |
-| Space-pad  | Default                               | spaces → sign → zeros → digits |
+The same two-path pattern appears again: left-align prints content then padding, right-align prints padding then content. The padding calculation uses `print_len` (the potentially truncated length) rather than the full string length, ensuring that width calculations account for truncation.
 
 ---
 
-## 5. Specifier Deep Dives
+## Step 6: Signed Integer Handler (ft_print_nbr.c)
 
-### %c - Character
+This is where the implementation becomes genuinely complex. Signed integers introduce nearly every challenging concept: negative numbers, sign characters, precision as minimum digits, zero-padding, and the interaction between all these features. Understanding this handler thoroughly prepares you for all the others.
 
-**Applicable Flags:** `-` (width for padding)
+### The INT_MIN Edge Case
 
-**Algorithm:**
+The most dangerous edge case with signed integers is `INT_MIN`, which on most systems is -2147483648. The problem is that its absolute value (2147483648) cannot be represented as an `int`—it exceeds `INT_MAX` (2147483647) by one. If you try to negate INT_MIN as an int, you get undefined behavior.
 
-```
-if (minus)
-    print char, then pad with spaces
-else
-    pad with spaces, then print char
-```
-
-**Examples:**
-
-| Format | Input | Output | Explanation            |
-| ------ | ----- | ------ | ---------------------- |
-| `%c`   | `'A'` | `A`    | Single character       |
-| `%5c`  | `'A'` | `A`    | Right-aligned, width 5 |
-| `%-5c` | `'A'` | `A`    | Left-aligned, width 5  |
-
-**Edge Cases:**
-
-- Width < 1: No padding
-- Zero flag: Ignored (always space padding)
-
----
-
-### %s - String
-
-**Applicable Flags:** `-` (width for padding)
-
-**Algorithm:**
-
-```
-if (str == NULL)
-    str = "(null)"
-len = strlen(str)
-print_len = (precision >= 0 && precision < len) ? precision : len
-if (minus)
-    print print_len chars, then pad
-else
-    pad, then print print_len chars
-```
-
-**Examples:**
-
-| Format   | Input     | Output   | Explanation              |
-| -------- | --------- | -------- | ------------------------ |
-| `%s`     | `"hello"` | `hello`  | Full string              |
-| `%10s`   | `"hello"` | `hello`  | Right-aligned, width 10  |
-| `%-10s`  | `"hello"` | `hello`  | Left-aligned             |
-| `%.3s`   | `"hello"` | `hel`    | Precision truncates to 3 |
-| `%10.3s` | `"hello"` | `hel`    | Width 10, precision 3    |
-| `%s`     | `NULL`    | `(null)` | NULL handling            |
-
-**Edge Cases:**
-
-- NULL string: Prints "(null)" (6 characters)
-- Precision = 0: Prints nothing from string
-- Width < string length: No truncation, just no padding
-
----
-
-### %p - Pointer
-
-**Applicable Flags:** `-` (width for padding)
-
-**Algorithm:**
-
-```
-if (ptr == NULL)
-    return print_nil()  // prints "(nil)"
-addr = (unsigned long)ptr
-total_len = hex_digit_count(addr) + 2  // +2 for "0x"
-if (minus)
-    print "0x", print hex digits, then pad
-else
-    pad, print "0x", print hex digits
-```
-
-**Examples:**
-
-| Format  | Input    | Output   | Explanation             |
-| ------- | -------- | -------- | ----------------------- |
-| `%p`    | `0x7fff` | `0x7fff` | Hex address with prefix |
-| `%20p`  | `0x7fff` | `0x7fff` | Right-aligned           |
-| `%-20p` | `0x7fff` | `0x7fff` | Left-aligned            |
-| `%p`    | `NULL`   | `(nil)`  | NULL handling           |
-
-**Edge Cases:**
-
-- NULL pointer: Prints "(nil)" (5 characters)
-- Always lowercase hex (a-f)
-- "0x" prefix always included (except NULL)
-
----
-
-### %d / %i - Signed Integer
-
-**Applicable Flags:** `-`, `0`, ` `, `+`
-
-**Algorithm:**
-
-```
-sign = get_sign_char(is_negative, spec)  // '-', '+', ' ', or none
-digit_len = count_digits(abs(n))
-if (n == 0 && precision == 0)
-    digit_len = 0  // Special case
-num_len = max(digit_len, precision)
-total_len = num_len + (sign ? 1 : 0)
-
-if (minus)
-    [sign][precision zeros][digits][space padding]
-else if (zero && precision < 0)
-    [sign][zero padding][digits]
-else
-    [space padding][sign][precision zeros][digits]
-```
-
-**Sign Priority:**
-
-1. Negative number → `-`
-2. Plus flag → `+`
-3. Space flag → ` `
-4. Otherwise → no sign character
-
-**Examples:**
-
-| Format  | Input | Output  | Explanation            |
-| ------- | ----- | ------- | ---------------------- |
-| `%d`    | `42`  | `42`    | Basic integer          |
-| `%5d`   | `42`  | `42`    | Width 5, space-padded  |
-| `%05d`  | `42`  | `00042` | Zero-padded            |
-| `%-5d`  | `42`  | `42`    | Left-aligned           |
-| `%+d`   | `42`  | `+42`   | Force sign             |
-| `% d`   | `42`  | `42`    | Space for positive     |
-| `%d`    | `-42` | `-42`   | Negative               |
-| `%05d`  | `-42` | `-0042` | Negative with zero-pad |
-| `%.5d`  | `42`  | `00042` | Precision = min digits |
-| `%8.5d` | `42`  | `00042` | Width and precision    |
-| `%.0d`  | `0`   | ``      | Zero with precision 0  |
-
-**Edge Cases:**
-
-- Zero with precision 0: Prints nothing
-- INT_MIN: Handled via long conversion
-- Precision overrides zero-padding
-
----
-
-### %u - Unsigned Integer
-
-**Applicable Flags:** `-`, `0`
-
-**Algorithm:**
-Same as `%d` but without sign handling.
-
-**Examples:**
-
-| Format | Input | Output  | Explanation           |
-| ------ | ----- | ------- | --------------------- |
-| `%u`   | `42`  | `42`    | Basic unsigned        |
-| `%5u`  | `42`  | `42`    | Width 5               |
-| `%05u` | `42`  | `00042` | Zero-padded           |
-| `%.5u` | `42`  | `00042` | Precision             |
-| `%.0u` | `0`   | ``      | Zero with precision 0 |
-
----
-
-### %x / %X - Hexadecimal
-
-**Applicable Flags:** `-`, `0`, `#`
-
-**Algorithm:**
-
-```
-digit_len = hex_digit_count(n)
-if (n == 0 && precision == 0)
-    digit_len = 0
-num_len = max(digit_len, precision)
-prefix_len = (hash && n != 0) ? 2 : 0  // "0x" or "0X"
-total_len = num_len + prefix_len
-
-if (minus)
-    [prefix][precision zeros][hex digits][space padding]
-else if (zero && precision < 0)
-    [prefix][zero padding][hex digits]
-else
-    [space padding][prefix][precision zeros][hex digits]
-```
-
-**Examples:**
-
-| Format  | Input | Output     | Explanation                |
-| ------- | ----- | ---------- | -------------------------- |
-| `%x`    | `255` | `ff`       | Lowercase hex              |
-| `%X`    | `255` | `FF`       | Uppercase hex              |
-| `%#x`   | `255` | `0xff`     | With prefix                |
-| `%#X`   | `255` | `0XFF`     | Uppercase prefix           |
-| `%8x`   | `255` | `ff`       | Width 8                    |
-| `%08x`  | `255` | `000000ff` | Zero-padded                |
-| `%#8x`  | `255` | `0xff`     | Prefix with width          |
-| `%#08x` | `255` | `0x0000ff` | Prefix + zero-pad          |
-| `%#x`   | `0`   | `0`        | Hash with zero (no prefix) |
-| `%.0x`  | `0`   | ``         | Zero with precision 0      |
-
-**Edge Cases:**
-
-- Hash flag with zero value: No prefix printed
-- Precision 0 with zero: Prints nothing
-
----
-
-### %% - Percent Literal
-
-**Algorithm:**
-Treated as `%c` with character `'%'`.
-
-**Examples:**
-
-| Format | Output |
-| ------ | ------ |
-| `%%`   | `%`    |
-| `%5%`  | `%`    |
-| `%-5%` | `%`    |
-
----
-
-## 6. Flag Interaction Matrix
-
-### Which Flags Affect Which Specifiers
-
-| Flag        | %c  | %s  | %p  | %d/%i | %u  | %x/%X | %%  |
-| ----------- | :-: | :-: | :-: | :---: | :-: | :---: | :-: |
-| `-` (minus) |  Y  |  Y  |  Y  |   Y   |  Y  |   Y   |  Y  |
-| `0` (zero)  |  -  |  -  |  -  |  Y\*  | Y\* |  Y\*  |  -  |
-| `#` (hash)  |  -  |  -  |  -  |   -   |  -  |   Y   |  -  |
-| ` ` (space) |  -  |  -  |  -  |   Y   |  -  |   -   |  -  |
-| `+` (plus)  |  -  |  -  |  -  |   Y   |  -  |   -   |  -  |
-
-\*Zero flag only applies when no precision specified and no minus flag
-
-### Flag Priority Rules
-
-1. **Minus disables Zero:** `-` flag makes `0` flag ineffective
-
-   ```
-   %0-5d  →  left-aligned with spaces, not zeros
-   ```
-
-2. **Plus overrides Space:** `+` takes priority over ` `
-
-   ```
-   %+ d   →  shows '+' not ' ' for positive
-   ```
-
-3. **Precision disables Zero-padding:** Specifying precision uses spaces
-
-   ```
-   %05.3d →  "  042" not "00042" (precision 3 = min 3 digits)
-   ```
-
----
-
-## 7. Precision vs Width
-
-### Key Distinctions
-
-| Aspect           | Width                   | Precision                   |
-| ---------------- | ----------------------- | --------------------------- |
-| **Symbol**       | Digits after flags      | `.` followed by digits      |
-| **For strings**  | Minimum field width     | Maximum characters to print |
-| **For numbers**  | Minimum field width     | Minimum digits to print     |
-| **Padding char** | Space (or zero if flag) | Always zero                 |
-| **Truncation**   | Never truncates         | Truncates strings only      |
-
-### Visual Comparison
-
-**Strings:**
-
-```
-Width 10:     printf("%10s", "hello")   →  "     hello"  (padded to 10)
-Precision 3:  printf("%.3s", "hello")   →  "hel"        (truncated to 3)
-Both:         printf("%10.3s", "hello") →  "       hel" (3 chars, width 10)
-```
-
-**Numbers:**
-
-```
-Width 10:     printf("%10d", 42)        →  "        42" (padded to 10)
-Precision 5:  printf("%.5d", 42)        →  "00042"      (5 digits minimum)
-Both:         printf("%10.5d", 42)      →  "     00042" (5 digits, width 10)
-```
-
-### Edge Cases
-
-**%.0d with 0:**
+The solution is to convert to `long` before negating:
 
 ```c
-printf("%.0d", 0);  // Output: "" (empty)
-printf("%5.0d", 0); // Output: "     " (5 spaces)
+long nb;
+nb = n;
+if (nb < 0)
+    nb = -nb;
 ```
 
-When precision is 0 and value is 0, nothing is printed for the number itself.
+By storing the value in a `long` first, the negation operates on a type that can hold the absolute value of INT_MIN safely.
 
-**%.3s truncation:**
+### Sign Character Priority
+
+A signed integer might need a sign character for several reasons, with a strict priority order:
+
+1. If the number is negative, the sign is always `-`
+2. Otherwise, if the plus flag is set, the sign is `+`
+3. Otherwise, if the space flag is set, the sign is a space
+4. Otherwise, there is no sign character
 
 ```c
-printf("%.3s", "hello");  // Output: "hel"
-printf("%.10s", "hello"); // Output: "hello" (no padding, just limits)
+static int ft_get_sign_char(int is_neg, t_fmt *spec)
+{
+    if (is_neg)
+        return ('-');
+    if (spec->plus)
+        return ('+');
+    if (spec->space)
+        return (' ');
+    return (0);
+}
 ```
 
-Precision limits but doesn't pad strings.
+The return value is either a character (as an int) or 0 meaning no sign. This makes it easy to check `if (sign)` to determine whether a sign character should be printed.
+
+### Recursive Digit Printing
+
+When printing the number 123, we need to print '1', then '2', then '3'. But when extracting digits with division and modulo, we get them in reverse order: 123 % 10 = 3, 123 / 10 = 12, 12 % 10 = 2, and so on. Recursion elegantly solves this by delaying the actual printing until we have extracted all digits:
+
+```c
+static int ft_print_digits(long n)
+{
+    int count;
+
+    count = 0;
+    if (n >= 10)
+        count += ft_print_digits(n / 10);
+    count += ft_putchar_count('0' + (n % 10));
+    return (count);
+}
+```
+
+For 123, this first recurses to print 12 (which recurses to print 1, then prints 2), and finally prints 3. The call stack naturally reverses the order of digits.
+
+### The Three Rendering Paths
+
+Number handlers are more complex than character or string handlers because the zero flag adds a third path. The zero flag means "pad with zeros instead of spaces," but this only applies when there is no minus flag (left-alignment always uses space padding on the right) and no precision (precision provides its own leading zeros).
+
+The three paths are:
+
+1. **Left-align path** (minus flag set): Print sign, precision zeros, digits, then space padding
+2. **Zero-padding path** (zero flag set, no minus, no precision): Print sign, zero padding, digits
+3. **Space-padding path** (default): Print space padding, sign, precision zeros, digits
+
+Notice the critical difference in where the sign appears. In the zero-padding path, the sign comes before the zeros, producing `-0042` rather than `000-42`. In the space-padding path, the sign comes after the spaces, producing `  -42`.
+
+### The lens Array Pattern
+
+To avoid recalculating lengths multiple times, we use an array to store computed values:
+
+```c
+static void ft_calc_lens(long nb, t_fmt *spec, int *lens)
+{
+    int digit_len;
+    int num_len;
+
+    digit_len = ft_num_len(nb);
+    if (nb == 0 && spec->precision == 0)
+        digit_len = 0;
+    num_len = digit_len;
+    if (spec->precision > digit_len)
+        num_len = spec->precision;
+    lens[0] = digit_len;
+    lens[1] = num_len;
+}
+```
+
+Here `lens[0]` is the actual number of digits, and `lens[1]` is the number of digits we will print (which may be larger due to precision). The difference `lens[1] - lens[0]` tells us how many precision zeros to add.
+
+### Precision 0 with Value 0
+
+A particularly tricky edge case: when the value is 0 and precision is 0, we print nothing for the number itself. The precision specifies the minimum number of digits, and zero digits is enough to represent the value zero. This is why we check `if (nb == 0 && spec->precision == 0)` and set `digit_len = 0` in that case.
+
+### The Complete Signed Integer Handler
+
+```c
+int ft_print_nbr(int n, t_fmt *spec)
+{
+    int     count;
+    int     lens[2];
+    long    nb;
+    int     sign;
+    int     total_len;
+    char    pad;
+
+    count = 0;
+    nb = n;
+    sign = ft_get_sign_char(nb < 0, spec);
+    if (nb < 0)
+        nb = -nb;
+    ft_calc_lens(nb, spec, lens);
+    total_len = lens[1] + (sign != 0);
+    pad = ' ';
+    if (spec->zero && !spec->minus && spec->precision < 0)
+        pad = '0';
+    if (spec->minus)
+    {
+        if (sign)
+            count += ft_putchar_count(sign);
+        count += ft_print_padding(lens[1] - lens[0], '0');
+        if (!(nb == 0 && spec->precision == 0))
+            count += ft_print_digits(nb);
+        count += ft_print_padding(spec->width - total_len, ' ');
+    }
+    else if (pad == '0')
+    {
+        if (sign)
+            count += ft_putchar_count(sign);
+        count += ft_print_padding(spec->width - total_len, '0');
+        if (!(nb == 0 && spec->precision == 0))
+            count += ft_print_digits(nb);
+    }
+    else
+    {
+        count += ft_print_padding(spec->width - total_len, ' ');
+        if (sign)
+            count += ft_putchar_count(sign);
+        count += ft_print_padding(lens[1] - lens[0], '0');
+        if (!(nb == 0 && spec->precision == 0))
+            count += ft_print_digits(nb);
+    }
+    return (count);
+}
+```
+
+Each rendering path prints elements in a specific order to achieve the correct output. The condition `!(nb == 0 && spec->precision == 0)` appears in all three paths to handle the special case of printing nothing when the value and precision are both zero.
 
 ---
 
-## 8. Common Edge Cases
+## Step 7: Unsigned Integer Handler (ft_print_unsigned.c)
 
-### Zero with Precision 0
+After understanding signed integers, unsigned integers are a relief. The structure is nearly identical, but we can remove all sign-related logic. There is no negative case to handle, no plus or space flag behavior, just straightforward number printing with width, precision, and zero-padding.
 
-When the value is 0 and precision is 0, the digit is suppressed:
+### Simplification from Signed
+
+The unsigned handler uses the same three-path structure as the signed handler, but without sign characters. The `total_len` calculation is simply `num_len` without any sign character addition. The digit printing function uses `unsigned int` instead of `long` because there is no negative case to worry about.
 
 ```c
-printf("%.0d", 0);     // ""
-printf("%5.0d", 0);    // "     "
-printf("%.0x", 0);     // ""
-printf("%#.0x", 0);    // "" (no prefix either)
+static int ft_print_udigits(unsigned int n)
+{
+    int count;
+
+    count = 0;
+    if (n >= 10)
+        count += ft_print_udigits(n / 10);
+    count += ft_putchar_count('0' + (n % 10));
+    return (count);
+}
 ```
 
-### NULL String
-
-NULL strings print as "(null)":
+### The Complete Unsigned Handler
 
 ```c
-printf("%s", NULL);      // "(null)"
-printf("%10s", NULL);    // "    (null)"
-printf("%.3s", NULL);    // "(nu" - precision applies!
+int ft_print_unsigned(unsigned int n, t_fmt *spec)
+{
+    int     count;
+    int     digit_len;
+    int     num_len;
+    int     total_len;
+    char    pad;
+
+    count = 0;
+    digit_len = ft_unum_len(n);
+    if (n == 0 && spec->precision == 0)
+        digit_len = 0;
+    num_len = digit_len;
+    if (spec->precision > digit_len)
+        num_len = spec->precision;
+    total_len = num_len;
+    pad = ' ';
+    if (spec->zero && !spec->minus && spec->precision < 0)
+        pad = '0';
+    if (spec->minus)
+    {
+        count += ft_print_padding(num_len - digit_len, '0');
+        if (!(n == 0 && spec->precision == 0))
+            count += ft_print_udigits(n);
+        count += ft_print_padding(spec->width - total_len, ' ');
+    }
+    else if (pad == '0')
+    {
+        count += ft_print_padding(spec->width - total_len, '0');
+        count += ft_print_padding(num_len - digit_len, '0');
+        if (!(n == 0 && spec->precision == 0))
+            count += ft_print_udigits(n);
+    }
+    else
+    {
+        count += ft_print_padding(spec->width - total_len, ' ');
+        count += ft_print_padding(num_len - digit_len, '0');
+        if (!(n == 0 && spec->precision == 0))
+            count += ft_print_udigits(n);
+    }
+    return (count);
+}
 ```
 
-### NULL Pointer
+The similarity to the signed handler is intentional—it makes the code easier to understand and maintain. The same three paths exist, handling the same cases, just without sign character logic.
 
-NULL pointers print as "(nil)":
+---
+
+## Step 8: Hexadecimal Handler (ft_print_hex.c)
+
+Hexadecimal printing adds two new complications: the hash flag (which adds a "0x" or "0X" prefix) and case handling (lowercase 'x' uses "abcdef", uppercase 'X' uses "ABCDEF"). The three-path structure remains, but now we must position the prefix correctly in each path.
+
+### Case Handling with Lookup Strings
+
+Rather than using conditional logic to convert digit values 10-15 to letters, we use a lookup string:
 
 ```c
-printf("%p", NULL);      // "(nil)"
-printf("%10p", NULL);    // "     (nil)"
+static int ft_print_hex_digits(unsigned int n, char format)
+{
+    int     count;
+    char    *hex;
+
+    count = 0;
+    if (format == 'X')
+        hex = "0123456789ABCDEF";
+    else
+        hex = "0123456789abcdef";
+    if (n >= 16)
+        count += ft_print_hex_digits(n / 16, format);
+    count += ft_putchar_count(hex[n % 16]);
+    return (count);
+}
 ```
 
-### Negative Numbers with Zero-Padding
+The value `n % 16` gives us a number from 0-15, and we use that directly as an index into our lookup string. This is cleaner and faster than a series of conditionals.
 
-Sign comes before zeros:
+### The Hash Flag: Prefix Only for Non-Zero
+
+The hash flag adds the "0x" or "0X" prefix, but with an important exception: when the value is zero, no prefix is added. This matches standard printf behavior and makes sense—"0x0" is a bit redundant; just "0" suffices.
 
 ```c
-printf("%05d", -42);     // "-0042" not "000-42"
-printf("%+05d", 42);     // "+0042"
+prefix_len = 0;
+if (spec->hash && n != 0)
+    prefix_len = 2;
 ```
 
-### Hash Flag Only for Non-Zero Hex
+This prefix length must be included in the total length calculation for width padding, and the prefix must be printed at the correct position in each rendering path.
 
-The `0x` prefix is not added for zero values:
+### Prefix Positioning
+
+In the zero-padding path, the prefix comes before the zeros: `0x000ff` not `000x0ff`. In the space-padding path, the prefix comes after the spaces: `    0xff` not `0x    ff`. The left-align path puts the prefix first, then digits, then space padding.
+
+### The Complete Hexadecimal Handler
 
 ```c
-printf("%#x", 255);  // "0xff"
-printf("%#x", 0);    // "0" (no prefix)
+int ft_print_hex(unsigned int n, t_fmt *spec)
+{
+    int     count;
+    int     lens[4];
+    char    pad;
+
+    count = 0;
+    ft_calc_hex_lens(n, spec, lens);
+    pad = ' ';
+    if (spec->zero && !spec->minus && spec->precision < 0)
+        pad = '0';
+    if (spec->minus)
+    {
+        if (lens[2])
+            count += ft_print_prefix(spec->specifier);
+        count += ft_print_padding(lens[1] - lens[0], '0');
+        if (!(n == 0 && spec->precision == 0))
+            count += ft_print_hex_digits(n, spec->specifier);
+        count += ft_print_padding(spec->width - lens[3], ' ');
+    }
+    else if (pad == '0')
+    {
+        if (lens[2])
+            count += ft_print_prefix(spec->specifier);
+        count += ft_print_padding(spec->width - lens[3], '0');
+        count += ft_print_padding(lens[1] - lens[0], '0');
+        if (!(n == 0 && spec->precision == 0))
+            count += ft_print_hex_digits(n, spec->specifier);
+    }
+    else
+    {
+        count += ft_print_padding(spec->width - lens[3], ' ');
+        if (lens[2])
+            count += ft_print_prefix(spec->specifier);
+        count += ft_print_padding(lens[1] - lens[0], '0');
+        if (!(n == 0 && spec->precision == 0))
+            count += ft_print_hex_digits(n, spec->specifier);
+    }
+    return (count);
+}
 ```
 
-### Precision and Zero-Padding Interaction
+The `lens` array stores: `[0]` = digit count, `[1]` = number length after precision, `[2]` = prefix length (0 or 2), `[3]` = total length. This keeps track of all the components that contribute to the output.
 
-Precision overrides zero-padding:
+---
+
+## Step 9: Pointer Handler (ft_print_ptr.c)
+
+Pointers are similar to hexadecimal but different enough to warrant their own file. The key differences are: the "0x" prefix is always present (not controlled by the hash flag), NULL pointers print "(nil)" instead of "0x0", and the address requires `unsigned long` to hold the full 64-bit value on modern systems.
+
+### Why Unsigned Long
+
+On 64-bit systems, pointers are 64 bits, but `unsigned int` is typically 32 bits. If we used `unsigned int`, we would truncate the address and print incorrect values. The `unsigned long` type is guaranteed to be large enough to hold a pointer value.
 
 ```c
-printf("%05d", 42);      // "00042" (zero-padded)
-printf("%05.3d", 42);    // "  042" (space-padded, 3 digit precision)
-printf("%05.0d", 0);     // "     " (5 spaces, nothing for 0)
+unsigned long addr;
+addr = (unsigned long)ptr;
+```
+
+### NULL Pointer Handling
+
+When the pointer is NULL, we print "(nil)" rather than "0x0". This clearly indicates a null pointer and matches the behavior of many printf implementations.
+
+```c
+if (!ptr)
+    return (ft_print_nil(spec->width, spec->minus));
+```
+
+The `ft_print_nil` function handles the two-path rendering (left-align vs right-align) for the "(nil)" string.
+
+### Simpler Than Hex
+
+Pointers do not support precision or zero-padding flags in our implementation, which simplifies the code significantly. We only have the two basic paths: left-align and right-align.
+
+### The Complete Pointer Handler
+
+```c
+int ft_print_ptr(void *ptr, t_fmt *spec)
+{
+    int             count;
+    int             total_len;
+    unsigned long   addr;
+
+    count = 0;
+    addr = (unsigned long)ptr;
+    if (!ptr)
+        return (ft_print_nil(spec->width, spec->minus));
+    total_len = ft_ptr_len(addr) + 2;
+    if (spec->minus)
+    {
+        count += ft_putchar_count('0');
+        count += ft_putchar_count('x');
+        count += ft_print_ptr_hex(addr);
+        count += ft_print_padding(spec->width - total_len, ' ');
+    }
+    else
+    {
+        count += ft_print_padding(spec->width - total_len, ' ');
+        count += ft_putchar_count('0');
+        count += ft_putchar_count('x');
+        count += ft_print_ptr_hex(addr);
+    }
+    return (count);
+}
+```
+
+The "+2" in `total_len` accounts for the "0x" prefix, which is always present for non-NULL pointers.
+
+---
+
+## Step 10: Main Entry Point (ft_printf.c)
+
+With all the components in place, we can finally write the main `ft_printf` function that ties everything together. This function orchestrates the entire process: it iterates through the format string, identifies format specifiers, parses them, and dispatches to the appropriate handler.
+
+### Variadic Arguments with stdarg.h
+
+The `ft_printf` function accepts a variable number of arguments using C's variadic function mechanism. The `<stdarg.h>` header provides the necessary macros: `va_list` for the argument list type, `va_start` to initialize it, `va_arg` to retrieve arguments, and `va_end` to clean up.
+
+```c
+va_list args;
+va_start(args, format);
+// ... use va_arg to get arguments ...
+va_end(args);
+```
+
+Each call to `va_arg` retrieves the next argument from the list. We must specify the expected type, which we determine from the specifier character.
+
+### The Main Loop
+
+The core logic is a simple loop through the format string. When we see a `%`, we parse the format specifier and dispatch to the appropriate handler. Otherwise, we print the literal character.
+
+```c
+while (format[i])
+{
+    if (format[i] == '%')
+    {
+        if (ft_parse_format(format, &i, &spec))
+            count += ft_dispatch(&spec, args);
+    }
+    else
+        count += ft_putchar_count(format[i]);
+    i++;
+}
+```
+
+Note that `ft_parse_format` advances `i` through the format specifier, leaving it pointing at the specifier character. The `i++` at the end of the loop then advances past that character, positioning us for the next iteration.
+
+### The Dispatch Function
+
+The dispatch function examines the specifier and calls the appropriate handler, passing the next variadic argument with the correct type:
+
+```c
+static int ft_dispatch(t_fmt *spec, va_list args)
+{
+    int count;
+
+    count = 0;
+    if (spec->specifier == 'c')
+        count = ft_print_char((char)va_arg(args, int), spec);
+    else if (spec->specifier == 's')
+        count = ft_print_str(va_arg(args, char *), spec);
+    else if (spec->specifier == 'p')
+        count = ft_print_ptr(va_arg(args, void *), spec);
+    else if (spec->specifier == 'd' || spec->specifier == 'i')
+        count = ft_print_nbr(va_arg(args, int), spec);
+    else if (spec->specifier == 'u')
+        count = ft_print_unsigned(va_arg(args, unsigned int), spec);
+    else if (spec->specifier == 'x' || spec->specifier == 'X')
+        count = ft_print_hex(va_arg(args, unsigned int), spec);
+    else if (spec->specifier == '%')
+        count = ft_print_char('%', spec);
+    return (count);
+}
+```
+
+Notice that `%c` retrieves an `int` and casts to `char`. This is because variadic functions promote `char` arguments to `int`, so we must retrieve them as `int` and cast back. Similarly, `%%` is handled by the character handler but does not consume a variadic argument—it simply prints a literal '%'.
+
+### NULL Format Check
+
+If the format string itself is NULL, we return -1 to indicate an error:
+
+```c
+if (!format)
+    return (-1);
+```
+
+This prevents dereferencing a NULL pointer and provides a way for callers to detect invalid input.
+
+### The Complete Entry Point
+
+```c
+int ft_printf(const char *format, ...)
+{
+    va_list args;
+    int     i;
+    int     count;
+    t_fmt   spec;
+
+    if (!format)
+        return (-1);
+    va_start(args, format);
+    i = 0;
+    count = 0;
+    while (format[i])
+    {
+        if (format[i] == '%')
+        {
+            if (ft_parse_format(format, &i, &spec))
+                count += ft_dispatch(&spec, args);
+        }
+        else
+            count += ft_putchar_count(format[i]);
+        i++;
+    }
+    va_end(args);
+    return (count);
+}
 ```
 
 ---
 
-## 9. Code Walkthrough Examples
+## Step 11: Building It (Makefile)
 
-### Example 1: `ft_printf("%05d", -42)` → `-0042`
+The Makefile automates compilation and links everything together into a library. Understanding the Makefile helps you understand how the pieces fit together.
 
-**Step-by-step execution:**
+### Compilation Flags
 
-1. **Parse format:** `%05d`
-   - Flags: `zero = 1`
-   - Width: `5`
-   - Precision: `-1` (not specified)
-   - Specifier: `d`
+We use the standard 42 School flags: `-Wall -Wextra -Werror`. These enable comprehensive warnings and treat warnings as errors, ensuring clean code.
 
-2. **Get argument:** `n = -42`
+### Linking with libft
 
-3. **Calculate lengths:**
-   - `nb = 42` (absolute value)
-   - `digit_len = 2` (digits in 42)
-   - `sign = '-'`
-   - `num_len = 2` (no precision adjustment)
-   - `total_len = 2 + 1 = 3` (digits + sign)
+Our implementation depends on libft for utility functions. The Makefile builds libft first, then copies it and adds our object files:
 
-4. **Determine padding:**
-   - `zero = 1`, `minus = 0`, `precision = -1`
-   - Use zero-padding path
-
-5. **Render (zero-padding path):**
-   - Print sign: `-` (count = 1)
-   - Print zero-padding: `width - total_len = 5 - 3 = 2` zeros → `00` (count = 3)
-   - Print digits: `42` (count = 5)
-
-**Output:** `-0042`
-
----
-
-### Example 2: `ft_printf("%#10x", 255)` → `0xff`
-
-**Step-by-step execution:**
-
-1. **Parse format:** `%#10x`
-   - Flags: `hash = 1`
-   - Width: `10`
-   - Precision: `-1`
-   - Specifier: `x`
-
-2. **Get argument:** `n = 255`
-
-3. **Calculate lengths:**
-   - `digit_len = 2` (ff)
-   - `prefix_len = 2` (0x, because hash=1 and n!=0)
-   - `num_len = 2`
-   - `total_len = 2 + 2 = 4`
-
-4. **Determine padding:**
-   - `zero = 0` → space-padding path
-
-5. **Render (space-padding path):**
-   - Print space-padding: `10 - 4 = 6` spaces → `      ` (count = 6)
-   - Print prefix: `0x` (count = 8)
-   - Print hex digits: `ff` (count = 10)
-
-**Output:** `0xff`
-
----
-
-### Example 3: `ft_printf("%-10.3s", "hello")` → `hel`
-
-**Step-by-step execution:**
-
-1. **Parse format:** `%-10.3s`
-   - Flags: `minus = 1`
-   - Width: `10`
-   - Precision: `3`
-   - Specifier: `s`
-
-2. **Get argument:** `s = "hello"`
-
-3. **Calculate lengths:**
-   - `len = 5` (strlen of "hello")
-   - `print_len = 3` (precision < len, so truncate)
-
-4. **Render (left-align path):**
-   - Print string content: `hel` (3 chars, count = 3)
-   - Print space-padding: `10 - 3 = 7` spaces → `       ` (count = 10)
-
-**Output:** `hel`
-
----
-
-## 10. Practice Exercises
-
-### Predict the Output
-
-Try to predict the output before checking the answers.
-
-1. `ft_printf("[%10d]", 42)`
-2. `ft_printf("[%-10d]", 42)`
-3. `ft_printf("[%010d]", 42)`
-4. `ft_printf("[%+d]", 42)`
-5. `ft_printf("[% d]", 42)`
-6. `ft_printf("[%5.3d]", 42)`
-7. `ft_printf("[%.0d]", 0)`
-8. `ft_printf("[%5.0d]", 0)`
-9. `ft_printf("[%#x]", 0)`
-10. `ft_printf("[%#8x]", 255)`
-11. `ft_printf("[%s]", NULL)`
-12. `ft_printf("[%10.3s]", "hello")`
-13. `ft_printf("[%p]", NULL)`
-14. `ft_printf("[%05d]", -42)`
-15. `ft_printf("[%+05d]", 42)`
-
-<details>
-<summary>Click to reveal answers</summary>
-
-1. `[        42]` - Right-aligned, width 10
-2. `[42        ]` - Left-aligned, width 10
-3. `[0000000042]` - Zero-padded, width 10
-4. `[+42]` - Plus flag forces sign
-5. `[ 42]` - Space before positive
-6. `[  042]` - Width 5, precision 3 (3 digits min)
-7. `[]` - Zero with precision 0 prints nothing
-8. `[     ]` - 5 spaces, nothing for the zero
-9. `[0]` - Hash with 0 has no prefix
-10. `[    0xff]` - Width 8 with prefix
-11. `[(null)]` - NULL string handling
-12. `[       hel]` - Width 10, precision 3 truncates
-13. `[(nil)]` - NULL pointer handling
-14. `[-0042]` - Sign before zeros
-15. `[+0042]` - Plus sign before zeros
-
-</details>
-
-### Flag Combination Challenges
-
-For each scenario, determine the correct format string:
-
-1. Print integer `42` as `+00042` (6 chars total)
-2. Print `255` as `0x000000ff` (10 chars total)
-3. Print `"hello"` left-aligned in 10-char field: `hello`
-4. Print first 3 chars of `"hello"` right-aligned in 8-char field: `hel`
-5. Print `-7` zero-padded to width 5: `-0007`
-
-<details>
-<summary>Click to reveal answers</summary>
-
-1. `%+06d` or `%+.5d` (both produce `+00042`)
-2. `%#010x` (width 10, zero-padded with prefix)
-3. `%-10s`
-4. `%8.3s`
-5. `%05d`
-
-</details>
-
----
-
-## Quick Reference Card
-
+```makefile
+$(NAME): $(LIBFT) $(OBJS)
+    cp $(LIBFT) $(NAME)
+    ar rcs $(NAME) $(OBJS)
 ```
-Format: %[flags][width][.precision]specifier
 
-FLAGS:
-  -   Left-align
-  0   Zero-pad (numbers only, if no precision)
-  #   Alternate form (0x for hex)
-  ' ' Space before positive
-  +   Always show sign
+This creates a single library file containing both libft functions and ft_printf functions.
 
-SPECIFIERS:
-  c   Character
-  s   String (NULL → "(null)")
-  p   Pointer (NULL → "(nil)")
-  d/i Signed integer
-  u   Unsigned integer
-  x/X Hexadecimal (lower/upper)
-  %   Literal percent
+### The Complete Makefile
 
-RULES:
-  • minus (-) disables zero (0)
-  • plus (+) overrides space ( )
-  • precision overrides zero-padding
-  • precision 0 + value 0 = empty output
-  • hash (#) + hex 0 = no prefix
+```makefile
+NAME = libftprintf.a
+CC = cc
+CFLAGS = -Wall -Wextra -Werror
+
+SRCS = ft_printf.c ft_parse_format.c ft_print_char.c ft_print_str.c \
+       ft_print_ptr.c ft_print_nbr.c ft_print_unsigned.c ft_print_hex.c \
+       ft_print_utils.c
+
+OBJS = $(SRCS:.c=.o)
+LIBFT_DIR = libft
+LIBFT = $(LIBFT_DIR)/libft.a
+
+all: $(NAME)
+
+$(NAME): $(LIBFT) $(OBJS)
+    cp $(LIBFT) $(NAME)
+    ar rcs $(NAME) $(OBJS)
+
+$(LIBFT):
+    $(MAKE) -C $(LIBFT_DIR)
+
+%.o: %.c ft_printf.h
+    $(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+    $(MAKE) -C $(LIBFT_DIR) clean
+    rm -f $(OBJS)
+
+fclean: clean
+    $(MAKE) -C $(LIBFT_DIR) fclean
+    rm -f $(NAME)
+
+re: fclean all
+
+.PHONY: all clean fclean re
 ```
 
 ---
 
-_This study guide is for educational purposes to understand the ft_printf implementation._
+## Testing Your Implementation
+
+Testing is crucial for a function as complex as ft_printf. Here are strategies and test cases that will reveal most bugs.
+
+### Basic Functionality Tests
+
+Start by verifying each specifier works in isolation:
+
+```c
+ft_printf("Character: %c\n", 'A');
+ft_printf("String: %s\n", "hello");
+ft_printf("Pointer: %p\n", &variable);
+ft_printf("Signed: %d, %i\n", 42, -42);
+ft_printf("Unsigned: %u\n", 4294967295);
+ft_printf("Hex lower: %x\n", 255);
+ft_printf("Hex upper: %X\n", 255);
+ft_printf("Percent: %%\n");
+```
+
+### Edge Cases That Commonly Fail
+
+These cases expose subtle bugs in implementations:
+
+```c
+// Precision 0 with value 0
+ft_printf("[%.0d]\n", 0);        // Should print "[]"
+ft_printf("[%5.0d]\n", 0);       // Should print "[     ]"
+
+// NULL handling
+ft_printf("[%s]\n", NULL);       // Should print "[(null)]"
+ft_printf("[%p]\n", NULL);       // Should print "[(nil)]"
+
+// INT_MIN
+ft_printf("[%d]\n", -2147483648); // Should print "[-2147483648]"
+
+// Hash with zero
+ft_printf("[%#x]\n", 0);         // Should print "[0]" (no prefix)
+
+// Zero-padding with negative
+ft_printf("[%05d]\n", -42);      // Should print "[-0042]"
+
+// Precision disables zero-padding
+ft_printf("[%05.3d]\n", 42);     // Should print "[  042]"
+
+// Width and precision together
+ft_printf("[%10.5d]\n", 42);     // Should print "[     00042]"
+```
+
+### Comparing with Real printf
+
+The definitive test is comparing your output with the real printf. Write a test program that calls both functions with the same arguments and compares the outputs and return values:
+
+```c
+#include <stdio.h>
+#include "ft_printf.h"
+
+int main(void)
+{
+    int ret1, ret2;
+
+    ret1 = printf("[%10.5d]\n", 42);
+    ret2 = ft_printf("[%10.5d]\n", 42);
+    if (ret1 != ret2)
+        printf("Return value mismatch: printf=%d, ft_printf=%d\n", ret1, ret2);
+    return (0);
+}
+```
+
+Run this with many different format strings and arguments. Any difference indicates a bug in your implementation.
+
+### Stress Testing with Many Arguments
+
+Test with many arguments to ensure variadic handling works correctly:
+
+```c
+ft_printf("%d %s %c %x %p\n", 42, "hello", 'A', 255, &variable);
+```
+
+### Verifying Return Values
+
+Remember that ft_printf must return the number of characters printed. Verify this for every test case—it is easy to have correct output but wrong return value.
+
+---
+
+## Conclusion
+
+Building ft_printf from scratch teaches you far more than just implementing a function. You learn about data structure design (the t_fmt structure), parsing techniques (handling optional components in order), algorithm patterns (recursion for digit printing, the three rendering paths), and the importance of handling edge cases (NULL pointers, INT_MIN, precision 0 with value 0).
+
+The implementation order we followed—header, utilities, parser, handlers from simple to complex, main function—mirrors how you would naturally build any complex system: start with the foundation, create reusable components, and assemble them into increasingly sophisticated structures.
+
+Now that you understand every piece, you can modify the implementation, add new specifiers, or use these patterns in other projects. The principles here—clean data structures, reusable utilities, systematic handling of variations—apply far beyond printf.
