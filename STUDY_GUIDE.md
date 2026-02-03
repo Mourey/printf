@@ -352,6 +352,7 @@ This is where the implementation becomes genuinely complex. Signed integers intr
 The original naive implementation of `ft_print_nbr` was over 40 lines—far exceeding the 42 Norm's 25-line limit. The solution is to decompose the problem into focused helper functions, each handling one specific responsibility. This isn't just about satisfying the Norm; it produces cleaner, more maintainable code.
 
 Our refactored approach uses **five static functions**:
+
 1. `ft_print_digits` — Recursively prints the digits of a number
 2. `ft_num_len` — Calculates how many digits a number has
 3. `ft_write_num` — Handles the core output: sign + precision zeros + digits
@@ -404,9 +405,9 @@ The sign variable is either a character (stored as an int) or 0 meaning no sign.
 When printing the number 123, we need to print '1', then '2', then '3'. But when extracting digits with division and modulo, we get them in reverse order: 123 % 10 = 3, 123 / 10 = 12, 12 % 10 = 2, and so on. Recursion elegantly solves this by delaying the actual printing until we have extracted all digits:
 
 ```c
-static int	ft_print_digits(long n)
+static int ft_print_digits(long n)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (n >= 10)
@@ -424,11 +425,11 @@ To satisfy the Norm's variable limit (max 5 per function) while avoiding recalcu
 
 **The `l[]` array stores three computed lengths:**
 
-| Index | Name | Meaning |
-|-------|------|---------|
-| `l[0]` | digit_len | Actual number of digits to print (0 if value=0 and precision=0) |
-| `l[1]` | num_len | Number length after applying precision (may include leading zeros) |
-| `l[2]` | total_len | Total content width: num_len + sign character (if present) |
+| Index  | Name      | Meaning                                                            |
+| ------ | --------- | ------------------------------------------------------------------ |
+| `l[0]` | digit_len | Actual number of digits to print (0 if value=0 and precision=0)    |
+| `l[1]` | num_len   | Number length after applying precision (may include leading zeros) |
+| `l[2]` | total_len | Total content width: num_len + sign character (if present)         |
 
 **Why use an array instead of separate variables?**
 
@@ -447,6 +448,7 @@ l[2] = l[1] + (sign != 0);
 ```
 
 Let's trace this for `-42` with precision 5 and plus flag:
+
 - `nb = 42` (after negation), `sign = '-'`
 - `l[0] = 2` (two digits: '4' and '2')
 - `l[1] = 5` (precision demands at least 5 digits)
@@ -458,9 +460,9 @@ Let's trace this for `-42` with precision 5 and plus flag:
 The `ft_num_len` function takes a special parameter:
 
 ```c
-static int	ft_num_len(long n, int prec_zero)
+static int ft_num_len(long n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -473,8 +475,9 @@ static int	ft_num_len(long n, int prec_zero)
 **Why pass it as a parameter?** This handles the tricky edge case where both the value AND precision are zero. In this case, we print **nothing** for the number—not even a '0'. The precision says "minimum 0 digits" and zero needs zero digits to represent.
 
 Examples:
+
 - `printf("%.0d", 0)` → prints "" (empty)
-- `printf("%5.0d", 0)` → prints "     " (5 spaces)
+- `printf("%5.0d", 0)` → prints " " (5 spaces)
 
 By handling this in `ft_num_len`, we ensure `l[0] = 0` for this case, which propagates correctly through all calculations.
 
@@ -486,16 +489,16 @@ Number handlers require three distinct rendering paths because padding position 
 2. **Zero-padding path** (zero flag, no minus, no precision): Print sign, zero padding, digits
 3. **Space-padding path** (default): Print space padding, sign, precision zeros, digits
 
-Notice the critical difference in where the sign appears. In the zero-padding path, the sign comes before the zeros, producing `-0042` rather than `000-42`. In the space-padding path, the sign comes after the spaces, producing `  -42`.
+Notice the critical difference in where the sign appears. In the zero-padding path, the sign comes before the zeros, producing `-0042` rather than `000-42`. In the space-padding path, the sign comes after the spaces, producing `-42`.
 
 ### The `ft_write_num` Helper: Shared Output Logic
 
 Two of the three paths share a common output sequence: sign → precision zeros → digits. We extract this into a helper:
 
 ```c
-static int	ft_write_num(long nb, int sign, int prec_pad, int digit_len)
+static int ft_write_num(long nb, int sign, int prec_pad, int digit_len)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (sign)
@@ -508,11 +511,12 @@ static int	ft_write_num(long nb, int sign, int prec_pad, int digit_len)
 ```
 
 **Parameters explained:**
-| Parameter | Purpose |
-|-----------|---------|
-| `nb` | The absolute value to print |
-| `sign` | Sign character ('-', '+', ' ') or 0 for none |
-| `prec_pad` | How many precision zeros to add (l[1] - l[0]) |
+
+| Parameter   | Purpose                                                   |
+| ----------- | --------------------------------------------------------- |
+| `nb`        | The absolute value to print                               |
+| `sign`      | Sign character ('-', '+', ' ') or 0 for none              |
+| `prec_pad`  | How many precision zeros to add (l[1] - l[0])             |
 | `digit_len` | How many actual digits (l[0]). If 0, don't print anything |
 
 **Why pass `digit_len` separately from `nb`?** Because when value=0 and precision=0, we have `nb=0` but `digit_len=0`, meaning "don't print the zero". We can't determine this from `nb` alone.
@@ -522,9 +526,9 @@ static int	ft_write_num(long nb, int sign, int prec_pad, int digit_len)
 This function implements the three rendering paths:
 
 ```c
-static int	ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
+static int ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
 {
-    int	c;
+    int c;
 
     if (sp->minus)
     {
@@ -549,11 +553,13 @@ static int	ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
 **Path-by-path analysis:**
 
 **Path 1 (Left-align):** `sp->minus` is set
+
 - Call `ft_write_num` to print: sign + precision zeros + digits
 - Then add trailing space padding to reach width
-- Example: `%-8.5d` with -42 → "-00042   " (content left, spaces right)
+- Example: `%-8.5d` with -42 → "-00042 " (content left, spaces right)
 
 **Path 2 (Zero-padding):** `sp->zero` set AND no precision (`sp->precision < 0`)
+
 - Print sign first (before the zeros!)
 - Then zero-pad to fill width
 - Then print digits
@@ -561,13 +567,15 @@ static int	ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
 - Example: `%08d` with -42 → "-0000042"
 
 **Path 3 (Space-padding):** Default case
+
 - Print leading space padding first
 - Then call `ft_write_num` for sign + precision zeros + digits
-- Example: `%8.5d` with -42 → "  -00042" (spaces left, content right)
+- Example: `%8.5d` with -42 → " -00042" (spaces left, content right)
 
 ### Why Path 2 Can't Reuse `ft_write_num`
 
 This is subtle but important. Look at the output for `%08d` with -42:
+
 ```
 -0000042
 ↑       ↑
@@ -575,6 +583,7 @@ sign    digits (zero-padding fills between)
 ```
 
 But `ft_write_num` would produce:
+
 ```
 -00042
 ↑    ↑
@@ -586,9 +595,9 @@ The difference: zero-padding (from the `0` flag) fills to the WIDTH, while preci
 ### The Complete Refactored Implementation
 
 ```c
-static int	ft_print_digits(long n)
+static int ft_print_digits(long n)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (n >= 10)
@@ -597,9 +606,9 @@ static int	ft_print_digits(long n)
     return (count);
 }
 
-static int	ft_num_len(long n, int prec_zero)
+static int ft_num_len(long n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -614,9 +623,9 @@ static int	ft_num_len(long n, int prec_zero)
     return (len);
 }
 
-static int	ft_write_num(long nb, int sign, int prec_pad, int digit_len)
+static int ft_write_num(long nb, int sign, int prec_pad, int digit_len)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (sign)
@@ -627,9 +636,9 @@ static int	ft_write_num(long nb, int sign, int prec_pad, int digit_len)
     return (count);
 }
 
-static int	ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
+static int ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
 {
-    int	c;
+    int c;
 
     if (sp->minus)
     {
@@ -650,11 +659,11 @@ static int	ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
     return (c + ft_write_num(nb, sign, l[1] - l[0], l[0]));
 }
 
-int	ft_print_nbr(int n, t_fmt *spec)
+int ft_print_nbr(int n, t_fmt *spec)
 {
-    int		l[3];
-    long	nb;
-    int		sign;
+    int  l[3];
+    long nb;
+    int  sign;
 
     nb = n;
     sign = 0;
@@ -678,13 +687,13 @@ int	ft_print_nbr(int n, t_fmt *spec)
 
 ### Line Count Summary
 
-| Function | Lines | Purpose |
-|----------|-------|---------|
-| `ft_print_digits` | 9 | Recursive digit output |
-| `ft_num_len` | 15 | Calculate digit count with edge case handling |
-| `ft_write_num` | 11 | Output sign + precision zeros + digits |
-| `ft_nbr_out` | 21 | Dispatch to correct rendering path |
-| `ft_print_nbr` | 22 | Setup and delegate |
+| Function          | Lines | Purpose                                       |
+| ----------------- | ----- | --------------------------------------------- |
+| `ft_print_digits` | 9     | Recursive digit output                        |
+| `ft_num_len`      | 15    | Calculate digit count with edge case handling |
+| `ft_write_num`    | 11    | Output sign + precision zeros + digits        |
+| `ft_nbr_out`      | 21    | Dispatch to correct rendering path            |
+| `ft_print_nbr`    | 22    | Setup and delegate                            |
 
 All functions are under 25 lines. Total: 5 functions in one file (at the Norm limit).
 
@@ -697,6 +706,7 @@ After understanding signed integers, unsigned integers are a relief. The structu
 ### Simplification from Signed
 
 The unsigned handler uses the same patterns as the signed handler, but simpler:
+
 - No sign character calculation (no `-`, `+`, or space)
 - No `long` conversion (unsigned int can't overflow on negation)
 - The `l[]` array only needs 2 elements instead of 3 (no sign to account for)
@@ -705,10 +715,10 @@ This results in a cleaner implementation with the same helper function pattern.
 
 ### The `l[]` Array for Unsigned (Only 2 Elements)
 
-| Index | Name | Meaning |
-|-------|------|---------|
+| Index  | Name      | Meaning                                                |
+| ------ | --------- | ------------------------------------------------------ |
 | `l[0]` | digit_len | Actual number of digits (0 if value=0 and precision=0) |
-| `l[1]` | num_len | Total length after applying precision |
+| `l[1]` | num_len   | Total length after applying precision                  |
 
 Notice there's no `l[2]` for total_len—since there's no sign, `l[1]` IS the total length. This simplification is why unsigned is easier than signed.
 
@@ -717,9 +727,9 @@ Notice there's no `l[2]` for total_len—since there's no sign, `l[1]` IS the to
 **`ft_print_udigits`** — Recursive digit printing (same logic as signed):
 
 ```c
-static int	ft_print_udigits(unsigned int n)
+static int ft_print_udigits(unsigned int n)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (n >= 10)
@@ -732,9 +742,9 @@ static int	ft_print_udigits(unsigned int n)
 **`ft_unum_len`** — Calculate digit count with the `prec_zero` edge case:
 
 ```c
-static int	ft_unum_len(unsigned int n, int prec_zero)
+static int ft_unum_len(unsigned int n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -753,9 +763,9 @@ static int	ft_unum_len(unsigned int n, int prec_zero)
 **`ft_write_unum`** — Outputs precision zeros + digits (no sign parameter needed):
 
 ```c
-static int	ft_write_unum(unsigned int n, int prec_pad, int digit_len)
+static int ft_write_unum(unsigned int n, int prec_pad, int digit_len)
 {
-    int	count;
+    int count;
 
     count = ft_print_padding(prec_pad, '0');
     if (digit_len > 0)
@@ -769,9 +779,9 @@ Compare to signed: `ft_write_num(nb, sign, prec_pad, digit_len)` has 4 parameter
 ### The Three-Path Dispatcher
 
 ```c
-static int	ft_unum_out(unsigned int n, t_fmt *sp, int *l)
+static int ft_unum_out(unsigned int n, t_fmt *sp, int *l)
 {
-    int	c;
+    int c;
 
     if (sp->minus)
     {
@@ -791,6 +801,7 @@ static int	ft_unum_out(unsigned int n, t_fmt *sp, int *l)
 **Key simplification:** In the zero-padding path (path 2), we CAN use `ft_write_unum` because there's no sign to worry about. The signed version couldn't do this because sign must come before padding zeros.
 
 **Path analysis:**
+
 - **Path 1 (Left-align):** precision zeros + digits → trailing spaces
 - **Path 2 (Zero-pad):** leading zeros → precision zeros + digits
 - **Path 3 (Space-pad):** leading spaces → precision zeros + digits
@@ -800,9 +811,9 @@ Notice paths 2 and 3 are identical except for the padding character. We could th
 ### The Complete Refactored Implementation
 
 ```c
-static int	ft_print_udigits(unsigned int n)
+static int ft_print_udigits(unsigned int n)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (n >= 10)
@@ -811,9 +822,9 @@ static int	ft_print_udigits(unsigned int n)
     return (count);
 }
 
-static int	ft_unum_len(unsigned int n, int prec_zero)
+static int ft_unum_len(unsigned int n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -828,9 +839,9 @@ static int	ft_unum_len(unsigned int n, int prec_zero)
     return (len);
 }
 
-static int	ft_write_unum(unsigned int n, int prec_pad, int digit_len)
+static int ft_write_unum(unsigned int n, int prec_pad, int digit_len)
 {
-    int	count;
+    int count;
 
     count = ft_print_padding(prec_pad, '0');
     if (digit_len > 0)
@@ -838,9 +849,9 @@ static int	ft_write_unum(unsigned int n, int prec_pad, int digit_len)
     return (count);
 }
 
-static int	ft_unum_out(unsigned int n, t_fmt *sp, int *l)
+static int ft_unum_out(unsigned int n, t_fmt *sp, int *l)
 {
-    int	c;
+    int c;
 
     if (sp->minus)
     {
@@ -856,9 +867,9 @@ static int	ft_unum_out(unsigned int n, t_fmt *sp, int *l)
     return (c + ft_write_unum(n, l[1] - l[0], l[0]));
 }
 
-int	ft_print_unsigned(unsigned int n, t_fmt *spec)
+int ft_print_unsigned(unsigned int n, t_fmt *spec)
 {
-    int	l[2];
+    int l[2];
 
     l[0] = ft_unum_len(n, n == 0 && spec->precision == 0);
     l[1] = l[0];
@@ -870,25 +881,25 @@ int	ft_print_unsigned(unsigned int n, t_fmt *spec)
 
 ### Line Count Summary
 
-| Function | Lines | Purpose |
-|----------|-------|---------|
-| `ft_print_udigits` | 9 | Recursive digit output |
-| `ft_unum_len` | 15 | Calculate digit count |
-| `ft_write_unum` | 8 | Output precision zeros + digits |
-| `ft_unum_out` | 16 | Dispatch to rendering path |
-| `ft_print_unsigned` | 10 | Setup and delegate |
+| Function            | Lines | Purpose                         |
+| ------------------- | ----- | ------------------------------- |
+| `ft_print_udigits`  | 9     | Recursive digit output          |
+| `ft_unum_len`       | 15    | Calculate digit count           |
+| `ft_write_unum`     | 8     | Output precision zeros + digits |
+| `ft_unum_out`       | 16    | Dispatch to rendering path      |
+| `ft_print_unsigned` | 10    | Setup and delegate              |
 
 All functions well under 25 lines. The main function is remarkably clean—just 10 lines that set up `l[]` and delegate.
 
 ### Comparison with Signed Handler
 
-| Aspect | Signed (`ft_print_nbr`) | Unsigned (`ft_print_unsigned`) |
-|--------|-------------------------|--------------------------------|
-| `l[]` array size | 3 elements | 2 elements |
-| Sign handling | Yes (-, +, space) | None |
-| Write helper params | 4 (nb, sign, prec_pad, digit_len) | 3 (n, prec_pad, digit_len) |
-| Type conversion | `int` → `long` (for INT_MIN) | None needed |
-| Zero-pad path | Can't use write helper | Uses write helper |
+| Aspect              | Signed (`ft_print_nbr`)           | Unsigned (`ft_print_unsigned`) |
+| ------------------- | --------------------------------- | ------------------------------ |
+| `l[]` array size    | 3 elements                        | 2 elements                     |
+| Sign handling       | Yes (-, +, space)                 | None                           |
+| Write helper params | 4 (nb, sign, prec_pad, digit_len) | 3 (n, prec_pad, digit_len)     |
+| Type conversion     | `int` → `long` (for INT_MIN)      | None needed                    |
+| Zero-pad path       | Can't use write helper            | Uses write helper              |
 
 The similarity in structure makes the code easier to understand—once you grasp the signed version, unsigned is just "the same, but simpler."
 
@@ -901,12 +912,14 @@ Hexadecimal printing adds two new complications: the hash flag (which adds a "0x
 ### New Complication: The `#` Flag Prefix
 
 The `#` (hash) flag adds a "0x" or "0X" prefix to hexadecimal output—but ONLY when:
+
 1. The hash flag is set (`spec->hash`)
 2. The value is NOT zero (`n != 0`)
 
 Why not for zero? Because "0x0" is redundant; "0" clearly represents zero in any base.
 
 This prefix adds complexity because:
+
 - It contributes 2 characters to the total width
 - It must appear BEFORE zero-padding (like a sign character in `%d`)
 - Its case must match the specifier (`0x` for `%x`, `0X` for `%X`)
@@ -915,10 +928,10 @@ This prefix adds complexity because:
 
 We use the same 2-element array pattern as unsigned, but handle the prefix separately:
 
-| Index | Name | Meaning |
-|-------|------|---------|
+| Index  | Name      | Meaning                                          |
+| ------ | --------- | ------------------------------------------------ |
 | `l[0]` | digit_len | Actual hex digits (0 if value=0 and precision=0) |
-| `l[1]` | num_len | Length after applying precision |
+| `l[1]` | num_len   | Length after applying precision                  |
 
 The prefix length (`plen`) is calculated separately: 0 or 2 depending on hash flag and value.
 
@@ -927,10 +940,10 @@ The prefix length (`plen`) is calculated separately: 0 or 2 depending on hash fl
 Rather than conditional logic for 10-15 → a-f conversion, we use lookup strings:
 
 ```c
-static int	ft_print_hex_digits(unsigned int n, char format)
+static int ft_print_hex_digits(unsigned int n, char format)
 {
-    int		count;
-    char	*hex;
+    int  count;
+    char *hex;
 
     count = 0;
     if (format == 'X')
@@ -945,6 +958,7 @@ static int	ft_print_hex_digits(unsigned int n, char format)
 ```
 
 **How it works:** `n % 16` gives 0-15, which directly indexes the string:
+
 - `hex[0]` = '0', `hex[9]` = '9'
 - `hex[10]` = 'A' or 'a', `hex[15]` = 'F' or 'f'
 
@@ -955,9 +969,9 @@ static int	ft_print_hex_digits(unsigned int n, char format)
 This helper consolidates the core output sequence:
 
 ```c
-static int	ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
+static int ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
 {
-    int	c;
+    int c;
 
     c = 0;
     if (sp->hash && n != 0)
@@ -973,12 +987,13 @@ static int	ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
 ```
 
 **Parameters explained:**
-| Parameter | Purpose |
-|-----------|---------|
-| `n` | The value to print |
-| `sp` | Format spec (needed for `hash` flag and `specifier`) |
-| `prec_pad` | How many precision zeros |
-| `dlen` | Digit length (0 means don't print anything) |
+
+| Parameter  | Purpose                                              |
+| ---------- | ---------------------------------------------------- |
+| `n`        | The value to print                                   |
+| `sp`       | Format spec (needed for `hash` flag and `specifier`) |
+| `prec_pad` | How many precision zeros                             |
+| `dlen`     | Digit length (0 means don't print anything)          |
 
 **Why pass `sp` instead of just `hash` and `specifier`?** Passing the whole spec avoids creating a function with too many parameters while keeping the interface clean.
 
@@ -987,10 +1002,10 @@ static int	ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
 The prefix behaves like a sign character—it must come BEFORE any padding zeros:
 
 ```c
-static int	ft_hex_out(unsigned int n, t_fmt *sp, int *l)
+static int ft_hex_out(unsigned int n, t_fmt *sp, int *l)
 {
-    int	c;
-    int	plen;
+    int c;
+    int plen;
 
     plen = 0;
     if (sp->hash && n != 0)
@@ -1013,12 +1028,14 @@ static int	ft_hex_out(unsigned int n, t_fmt *sp, int *l)
 **Path-by-path analysis:**
 
 **Path 1 (Left-align):** `sp->minus` is set
+
 - `ft_write_hex` outputs: prefix + precision zeros + digits
 - Then add trailing space padding
 - Width calculation: `sp->width - l[1] - plen` (subtract both digit length AND prefix length)
-- Example: `%-#8x` with 255 → "0xff    " (content left, spaces right)
+- Example: `%-#8x` with 255 → "0xff " (content left, spaces right)
 
 **Path 2 (Zero-pad):** `sp->zero` set AND no precision
+
 - This is the tricky path! We need:
   - Prefix first (via `ft_write_hex`)
   - Then enough zeros to fill the width
@@ -1027,9 +1044,10 @@ static int	ft_hex_out(unsigned int n, t_fmt *sp, int *l)
 - Example: `%#08x` with 255 → "0x0000ff"
 
 **Path 3 (Space-pad):** Default case
+
 - Leading spaces first
 - Then `ft_write_hex` for prefix + precision zeros + digits
-- Example: `%#8x` with 255 → "    0xff"
+- Example: `%#8x` with 255 → " 0xff"
 
 ### Understanding the Zero-Pad Calculation
 
@@ -1042,6 +1060,7 @@ c = ft_write_hex(n, sp, sp->width - l[1] - plen + l[1] - l[0], l[0]);
 Let's simplify: `sp->width - l[1] - plen + l[1] - l[0]` = `sp->width - plen - l[0]`
 
 For `%#08x` with 255:
+
 - `sp->width = 8`
 - `plen = 2` (hash flag, non-zero value)
 - `l[0] = 2` (two digits: 'ff')
@@ -1053,10 +1072,10 @@ Why this math? We're computing: `total_width - prefix_width - actual_digits = pa
 ### The Complete Refactored Implementation
 
 ```c
-static int	ft_print_hex_digits(unsigned int n, char format)
+static int ft_print_hex_digits(unsigned int n, char format)
 {
-    int		count;
-    char	*hex;
+    int  count;
+    char *hex;
 
     count = 0;
     if (format == 'X')
@@ -1069,9 +1088,9 @@ static int	ft_print_hex_digits(unsigned int n, char format)
     return (count);
 }
 
-static int	ft_hex_len(unsigned int n, int prec_zero)
+static int ft_hex_len(unsigned int n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -1086,9 +1105,9 @@ static int	ft_hex_len(unsigned int n, int prec_zero)
     return (len);
 }
 
-static int	ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
+static int ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
 {
-    int	c;
+    int c;
 
     c = 0;
     if (sp->hash && n != 0)
@@ -1102,10 +1121,10 @@ static int	ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
     return (c);
 }
 
-static int	ft_hex_out(unsigned int n, t_fmt *sp, int *l)
+static int ft_hex_out(unsigned int n, t_fmt *sp, int *l)
 {
-    int	c;
-    int	plen;
+    int c;
+    int plen;
 
     plen = 0;
     if (sp->hash && n != 0)
@@ -1124,9 +1143,9 @@ static int	ft_hex_out(unsigned int n, t_fmt *sp, int *l)
     return (c + ft_write_hex(n, sp, l[1] - l[0], l[0]));
 }
 
-int	ft_print_hex(unsigned int n, t_fmt *spec)
+int ft_print_hex(unsigned int n, t_fmt *spec)
 {
-    int	l[2];
+    int l[2];
 
     l[0] = ft_hex_len(n, n == 0 && spec->precision == 0);
     l[1] = l[0];
@@ -1138,25 +1157,25 @@ int	ft_print_hex(unsigned int n, t_fmt *spec)
 
 ### Line Count Summary
 
-| Function | Lines | Purpose |
-|----------|-------|---------|
-| `ft_print_hex_digits` | 14 | Recursive hex digit output with lookup |
-| `ft_hex_len` | 15 | Calculate hex digit count |
-| `ft_write_hex` | 14 | Output prefix + precision zeros + digits |
-| `ft_hex_out` | 20 | Dispatch to rendering path |
-| `ft_print_hex` | 10 | Setup and delegate |
+| Function              | Lines | Purpose                                  |
+| --------------------- | ----- | ---------------------------------------- |
+| `ft_print_hex_digits` | 14    | Recursive hex digit output with lookup   |
+| `ft_hex_len`          | 15    | Calculate hex digit count                |
+| `ft_write_hex`        | 14    | Output prefix + precision zeros + digits |
+| `ft_hex_out`          | 20    | Dispatch to rendering path               |
+| `ft_print_hex`        | 10    | Setup and delegate                       |
 
 All functions well under 25 lines.
 
 ### Comparison: Hex vs Unsigned vs Signed
 
-| Feature | Signed | Unsigned | Hex |
-|---------|--------|----------|-----|
-| Division base | 10 | 10 | 16 |
-| Sign handling | Yes | No | No |
-| Prefix handling | No | No | Yes (`#` flag) |
-| Case variation | No | No | Yes (`x`/`X`) |
-| `l[]` elements | 3 | 2 | 2 |
+| Feature          | Signed        | Unsigned   | Hex             |
+| ---------------- | ------------- | ---------- | --------------- |
+| Division base    | 10            | 10         | 16              |
+| Sign handling    | Yes           | No         | No              |
+| Prefix handling  | No            | No         | Yes (`#` flag)  |
+| Case variation   | No            | No         | Yes (`x`/`X`)   |
+| `l[]` elements   | 3             | 2          | 2               |
 | Extra complexity | Sign position | (simplest) | Prefix position |
 
 The hex handler is similar in complexity to signed because the prefix has the same positioning constraints as a sign character—it must come before any zero-padding.
@@ -1494,39 +1513,39 @@ The 42 School coding standard (the "Norm") imposes strict rules on code formatti
 
 After refactoring, every function in the codebase meets the 25-line requirement:
 
-| File | Function | Lines | Status |
-|------|----------|-------|--------|
-| `ft_printf.c` | `ft_dispatch` | 20 | ✓ Compliant |
-| `ft_printf.c` | `ft_printf` | 25 | ✓ Compliant |
-| `ft_parse_format.c` | `ft_init_spec` | 10 | ✓ Compliant |
-| `ft_parse_format.c` | `ft_parse_flags` | 16 | ✓ Compliant |
-| `ft_parse_format.c` | `ft_parse_width` | 7 | ✓ Compliant |
-| `ft_parse_format.c` | `ft_parse_precision` | 12 | ✓ Compliant |
-| `ft_parse_format.c` | `ft_parse_format` | 13 | ✓ Compliant |
-| `ft_print_utils.c` | `ft_putchar_count` | 4 | ✓ Compliant |
-| `ft_print_utils.c` | `ft_print_padding` | 10 | ✓ Compliant |
-| `ft_print_char.c` | `ft_print_char` | 15 | ✓ Compliant |
-| `ft_print_str.c` | `ft_print_str_content` | 12 | ✓ Compliant |
-| `ft_print_str.c` | `ft_print_str` | 22 | ✓ Compliant |
-| `ft_print_nbr.c` | `ft_print_digits` | 9 | ✓ Compliant |
-| `ft_print_nbr.c` | `ft_num_len` | 15 | ✓ Compliant |
-| `ft_print_nbr.c` | `ft_write_num` | 11 | ✓ Compliant |
-| `ft_print_nbr.c` | `ft_nbr_out` | 21 | ✓ Compliant |
-| `ft_print_nbr.c` | `ft_print_nbr` | 22 | ✓ Compliant |
-| `ft_print_unsigned.c` | `ft_print_udigits` | 9 | ✓ Compliant |
-| `ft_print_unsigned.c` | `ft_unum_len` | 15 | ✓ Compliant |
-| `ft_print_unsigned.c` | `ft_write_unum` | 8 | ✓ Compliant |
-| `ft_print_unsigned.c` | `ft_unum_out` | 16 | ✓ Compliant |
-| `ft_print_unsigned.c` | `ft_print_unsigned` | 10 | ✓ Compliant |
-| `ft_print_hex.c` | `ft_print_hex_digits` | 14 | ✓ Compliant |
-| `ft_print_hex.c` | `ft_hex_len` | 15 | ✓ Compliant |
-| `ft_print_hex.c` | `ft_write_hex` | 14 | ✓ Compliant |
-| `ft_print_hex.c` | `ft_hex_out` | 20 | ✓ Compliant |
-| `ft_print_hex.c` | `ft_print_hex` | 10 | ✓ Compliant |
-| `ft_print_ptr.c` | `ft_ptr_len` | 12 | ✓ Compliant |
-| `ft_print_ptr.c` | `ft_print_ptr_hex` | 11 | ✓ Compliant |
-| `ft_print_ptr.c` | `ft_print_nil` | 21 | ✓ Compliant |
-| `ft_print_ptr.c` | `ft_print_ptr` | 26 | ⚠️ Needs attention |
+| File                  | Function               | Lines | Status             |
+| --------------------- | ---------------------- | ----- | ------------------ |
+| `ft_printf.c`         | `ft_dispatch`          | 20    | ✓ Compliant        |
+| `ft_printf.c`         | `ft_printf`            | 25    | ✓ Compliant        |
+| `ft_parse_format.c`   | `ft_init_spec`         | 10    | ✓ Compliant        |
+| `ft_parse_format.c`   | `ft_parse_flags`       | 16    | ✓ Compliant        |
+| `ft_parse_format.c`   | `ft_parse_width`       | 7     | ✓ Compliant        |
+| `ft_parse_format.c`   | `ft_parse_precision`   | 12    | ✓ Compliant        |
+| `ft_parse_format.c`   | `ft_parse_format`      | 13    | ✓ Compliant        |
+| `ft_print_utils.c`    | `ft_putchar_count`     | 4     | ✓ Compliant        |
+| `ft_print_utils.c`    | `ft_print_padding`     | 10    | ✓ Compliant        |
+| `ft_print_char.c`     | `ft_print_char`        | 15    | ✓ Compliant        |
+| `ft_print_str.c`      | `ft_print_str_content` | 12    | ✓ Compliant        |
+| `ft_print_str.c`      | `ft_print_str`         | 22    | ✓ Compliant        |
+| `ft_print_nbr.c`      | `ft_print_digits`      | 9     | ✓ Compliant        |
+| `ft_print_nbr.c`      | `ft_num_len`           | 15    | ✓ Compliant        |
+| `ft_print_nbr.c`      | `ft_write_num`         | 11    | ✓ Compliant        |
+| `ft_print_nbr.c`      | `ft_nbr_out`           | 21    | ✓ Compliant        |
+| `ft_print_nbr.c`      | `ft_print_nbr`         | 22    | ✓ Compliant        |
+| `ft_print_unsigned.c` | `ft_print_udigits`     | 9     | ✓ Compliant        |
+| `ft_print_unsigned.c` | `ft_unum_len`          | 15    | ✓ Compliant        |
+| `ft_print_unsigned.c` | `ft_write_unum`        | 8     | ✓ Compliant        |
+| `ft_print_unsigned.c` | `ft_unum_out`          | 16    | ✓ Compliant        |
+| `ft_print_unsigned.c` | `ft_print_unsigned`    | 10    | ✓ Compliant        |
+| `ft_print_hex.c`      | `ft_print_hex_digits`  | 14    | ✓ Compliant        |
+| `ft_print_hex.c`      | `ft_hex_len`           | 15    | ✓ Compliant        |
+| `ft_print_hex.c`      | `ft_write_hex`         | 14    | ✓ Compliant        |
+| `ft_print_hex.c`      | `ft_hex_out`           | 20    | ✓ Compliant        |
+| `ft_print_hex.c`      | `ft_print_hex`         | 10    | ✓ Compliant        |
+| `ft_print_ptr.c`      | `ft_ptr_len`           | 12    | ✓ Compliant        |
+| `ft_print_ptr.c`      | `ft_print_ptr_hex`     | 11    | ✓ Compliant        |
+| `ft_print_ptr.c`      | `ft_print_nil`         | 21    | ✓ Compliant        |
+| `ft_print_ptr.c`      | `ft_print_ptr`         | 26    | ⚠️ Needs attention |
 
 ### The Refactoring Strategy That Worked
 
@@ -1555,6 +1574,7 @@ int l[3];  // Counts as ONE variable, stores THREE values
 ```
 
 **Standard meanings:**
+
 - `l[0]` = actual digit count (may be 0 for precision edge case)
 - `l[1]` = digit count after applying precision
 - `l[2]` = total width including sign/prefix (for signed integers)
@@ -1563,17 +1583,17 @@ int l[3];  // Counts as ONE variable, stores THREE values
 
 All files now have exactly 5 or fewer functions:
 
-| File | Function Count | Status |
-|------|----------------|--------|
-| `ft_printf.c` | 2 | ✓ Compliant |
-| `ft_parse_format.c` | 5 | ✓ At limit |
-| `ft_print_utils.c` | 2 | ✓ Compliant |
-| `ft_print_char.c` | 1 | ✓ Compliant |
-| `ft_print_str.c` | 2 | ✓ Compliant |
-| `ft_print_nbr.c` | 5 | ✓ At limit |
-| `ft_print_unsigned.c` | 5 | ✓ At limit |
-| `ft_print_hex.c` | 5 | ✓ At limit |
-| `ft_print_ptr.c` | 4 | ✓ Compliant |
+| File                  | Function Count | Status      |
+| --------------------- | -------------- | ----------- |
+| `ft_printf.c`         | 2              | ✓ Compliant |
+| `ft_parse_format.c`   | 5              | ✓ At limit  |
+| `ft_print_utils.c`    | 2              | ✓ Compliant |
+| `ft_print_char.c`     | 1              | ✓ Compliant |
+| `ft_print_str.c`      | 2              | ✓ Compliant |
+| `ft_print_nbr.c`      | 5              | ✓ At limit  |
+| `ft_print_unsigned.c` | 5              | ✓ At limit  |
+| `ft_print_hex.c`      | 5              | ✓ At limit  |
+| `ft_print_ptr.c`      | 4              | ✓ Compliant |
 
 ### Why the Three-Path Pattern Created the Original Problem
 
@@ -1675,6 +1695,7 @@ printf("[%015d]", -2147483648); // Output: "[-00002147483648]"
 ```
 
 **Implementation detail:** We convert to `long` before negating:
+
 ```c
 long nb = n;      // n is INT_MIN (-2147483648)
 if (nb < 0)
@@ -1773,20 +1794,20 @@ printf("[%.100d]", 42);  // Output: 98 zeros followed by "42"
 
 ### Edge Cases Quick Reference Table
 
-| Format | Value | Output | Notes |
-|--------|-------|--------|-------|
-| `%.0d` | 0 | `` | No digits for zero with precision 0 |
-| `%.d` | 0 | `` | Same as %.0d |
-| `%5.0d` | 0 | `     ` | 5 spaces, no digits |
-| `%s` | NULL | `(null)` | 6 characters |
-| `%.3s` | NULL | `(nu` | Truncated! |
-| `%p` | NULL | `(nil)` | 5 characters |
-| `%d` | INT_MIN | `-2147483648` | Requires long conversion |
-| `%#x` | 0 | `0` | No prefix for zero |
-| `%#.0x` | 0 | `` | No output at all |
-| `%-05d` | 42 | `42   ` | Minus overrides zero |
-| `%+ d` | 42 | `+42` | Plus overrides space |
-| `%08.5d` | 42 | `   00042` | Precision disables zero-pad |
+| Format   | Value   | Output        | Notes                               |
+| -------- | ------- | ------------- | ----------------------------------- |
+| `%.0d`   | 0       | ``            | No digits for zero with precision 0 |
+| `%.d`    | 0       | ``            | Same as %.0d                        |
+| `%5.0d`  | 0       | `     `       | 5 spaces, no digits                 |
+| `%s`     | NULL    | `(null)`      | 6 characters                        |
+| `%.3s`   | NULL    | `(nu`         | Truncated!                          |
+| `%p`     | NULL    | `(nil)`       | 5 characters                        |
+| `%d`     | INT_MIN | `-2147483648` | Requires long conversion            |
+| `%#x`    | 0       | `0`           | No prefix for zero                  |
+| `%#.0x`  | 0       | ``            | No output at all                    |
+| `%-05d`  | 42      | `42`          | Minus overrides zero                |
+| `%+ d`   | 42      | `+42`         | Plus overrides space                |
+| `%08.5d` | 42      | `00042`       | Precision disables zero-pad         |
 
 ---
 
@@ -1799,6 +1820,7 @@ This section documents potential issues, limitations, and areas for improvement 
 **Location:** `ft_parse_format.c`, lines 45-51 and 54-66
 
 **Problem:** The parser accumulates width and precision values using:
+
 ```c
 spec->width = spec->width * 10 + (fmt[*i] - '0');
 ```
@@ -1808,11 +1830,13 @@ If the format string contains an extremely large number (e.g., `%99999999999d`),
 **Risk Level:** Low in practice (malicious format strings required)
 
 **Demonstration:**
+
 ```c
 ft_printf("%2147483648d", 42);  // Overflows int, undefined behavior
 ```
 
 **Fix:**
+
 ```c
 static void ft_parse_width(const char *fmt, int *i, t_fmt *spec)
 {
@@ -1840,6 +1864,7 @@ static void ft_parse_width(const char *fmt, int *i, t_fmt *spec)
 **Location:** `ft_print_utils.c`, line 17
 
 **Problem:** The `write()` system call can fail (returning -1), but we ignore its return value:
+
 ```c
 int ft_putchar_count(char c)
 {
@@ -1851,11 +1876,13 @@ int ft_putchar_count(char c)
 **Risk Level:** Medium (silent data loss possible)
 
 **Consequences:**
+
 - If stdout is closed or redirected to a full disk, writes fail silently
 - The return value of `ft_printf` will be incorrect (counts unwritten characters)
 - No way for the caller to detect the failure
 
 **Fix (Basic):**
+
 ```c
 int ft_putchar_count(char c)
 {
@@ -1872,11 +1899,13 @@ int ft_putchar_count(char c)
 **Location:** `ft_printf.c`, lines 51-58
 
 **Problem:** When a format string ends with a lone `%`, the behavior is technically undefined:
+
 ```c
 ft_printf("hello%");  // What happens?
 ```
 
 **Current Behavior:**
+
 1. `ft_parse_format` is called, increments `i` past the `%`
 2. `fmt[*i]` is now `\0` (null terminator)
 3. The specifier check fails (null is not in "cspdiuxX%")
@@ -1886,6 +1915,7 @@ ft_printf("hello%");  // What happens?
 **Risk Level:** Low (undefined input produces undefined output)
 
 **Fix:**
+
 ```c
 int ft_parse_format(const char *fmt, int *i, t_fmt *spec)
 {
@@ -1907,12 +1937,14 @@ int ft_parse_format(const char *fmt, int *i, t_fmt *spec)
 **Impact:** For a format string producing 1000 characters, we make 1000 system calls instead of 1.
 
 **Demonstration:**
+
 ```c
 // This makes 100 system calls:
 ft_printf("%100d", 42);
 ```
 
 **Fix (Buffered Output):**
+
 ```c
 #define BUFFER_SIZE 4096
 
@@ -1946,6 +1978,7 @@ int ft_putchar_count(char c)
 **Location:** `ft_print_hex.c`, lines 37-39; `ft_print_ptr.c`, line 36
 
 **Code:**
+
 ```c
 if (format == 'X')
     hex = "0123456789ABCDEF";
@@ -1958,6 +1991,7 @@ else
 **Risk Level:** Very low (the code only reads from these strings)
 
 **Fix:**
+
 ```c
 const char *hex;
 
@@ -1969,13 +2003,13 @@ else
 
 ### Summary of Issues
 
-| Issue | Severity | Likelihood | Recommendation |
-|-------|----------|------------|----------------|
-| Integer overflow in parser | Medium | Low | Fix for production code |
-| Write error ignored | Medium | Low | Consider for robust code |
-| Trailing % handling | Low | Very Low | Fix if strict compliance needed |
-| Performance (unbuffered) | Low | N/A | Accept for project scope |
-| Non-const string pointers | Very Low | N/A | Fix for code cleanliness |
+| Issue                      | Severity | Likelihood | Recommendation                  |
+| -------------------------- | -------- | ---------- | ------------------------------- |
+| Integer overflow in parser | Medium   | Low        | Fix for production code         |
+| Write error ignored        | Medium   | Low        | Consider for robust code        |
+| Trailing % handling        | Low      | Very Low   | Fix if strict compliance needed |
+| Performance (unbuffered)   | Low      | N/A        | Accept for project scope        |
+| Non-const string pointers  | Very Low | N/A        | Fix for code cleanliness        |
 
 ---
 
@@ -1997,9 +2031,9 @@ This section documents the **actual refactored code** that is now in the reposit
 **Structure:** 5 functions, all static except `ft_print_nbr`
 
 ```c
-static int	ft_print_digits(long n)
+static int ft_print_digits(long n)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (n >= 10)
@@ -2008,9 +2042,9 @@ static int	ft_print_digits(long n)
     return (count);
 }
 
-static int	ft_num_len(long n, int prec_zero)
+static int ft_num_len(long n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -2025,9 +2059,9 @@ static int	ft_num_len(long n, int prec_zero)
     return (len);
 }
 
-static int	ft_write_num(long nb, int sign, int prec_pad, int digit_len)
+static int ft_write_num(long nb, int sign, int prec_pad, int digit_len)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (sign)
@@ -2038,9 +2072,9 @@ static int	ft_write_num(long nb, int sign, int prec_pad, int digit_len)
     return (count);
 }
 
-static int	ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
+static int ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
 {
-    int	c;
+    int c;
 
     if (sp->minus)
     {
@@ -2061,11 +2095,11 @@ static int	ft_nbr_out(long nb, t_fmt *sp, int sign, int *l)
     return (c + ft_write_num(nb, sign, l[1] - l[0], l[0]));
 }
 
-int	ft_print_nbr(int n, t_fmt *spec)
+int ft_print_nbr(int n, t_fmt *spec)
 {
-    int		l[3];
-    long	nb;
-    int		sign;
+    int  l[3];
+    long nb;
+    int  sign;
 
     nb = n;
     sign = 0;
@@ -2088,13 +2122,14 @@ int	ft_print_nbr(int n, t_fmt *spec)
 ```
 
 **Variable Reference:**
-| Variable | Location | Purpose |
-|----------|----------|---------|
-| `l[0]` | ft_print_nbr | Actual digit count |
-| `l[1]` | ft_print_nbr | Digit count after precision |
-| `l[2]` | ft_print_nbr | Total length (digits + sign) |
-| `sign` | ft_print_nbr | Sign character or 0 |
-| `nb` | ft_print_nbr | Absolute value as long |
+
+| Variable   | Location     | Purpose                        |
+| ---------- | ------------ | ------------------------------ |
+| `l[0]`     | ft_print_nbr | Actual digit count             |
+| `l[1]`     | ft_print_nbr | Digit count after precision    |
+| `l[2]`     | ft_print_nbr | Total length (digits + sign)   |
+| `sign`     | ft_print_nbr | Sign character or 0            |
+| `nb`       | ft_print_nbr | Absolute value as long         |
 | `prec_pad` | ft_write_num | Precision zeros: `l[1] - l[0]` |
 
 ---
@@ -2104,9 +2139,9 @@ int	ft_print_nbr(int n, t_fmt *spec)
 **Structure:** 5 functions, simpler than signed (no sign handling)
 
 ```c
-static int	ft_print_udigits(unsigned int n)
+static int ft_print_udigits(unsigned int n)
 {
-    int	count;
+    int count;
 
     count = 0;
     if (n >= 10)
@@ -2115,9 +2150,9 @@ static int	ft_print_udigits(unsigned int n)
     return (count);
 }
 
-static int	ft_unum_len(unsigned int n, int prec_zero)
+static int ft_unum_len(unsigned int n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -2132,9 +2167,9 @@ static int	ft_unum_len(unsigned int n, int prec_zero)
     return (len);
 }
 
-static int	ft_write_unum(unsigned int n, int prec_pad, int digit_len)
+static int ft_write_unum(unsigned int n, int prec_pad, int digit_len)
 {
-    int	count;
+    int count;
 
     count = ft_print_padding(prec_pad, '0');
     if (digit_len > 0)
@@ -2142,9 +2177,9 @@ static int	ft_write_unum(unsigned int n, int prec_pad, int digit_len)
     return (count);
 }
 
-static int	ft_unum_out(unsigned int n, t_fmt *sp, int *l)
+static int ft_unum_out(unsigned int n, t_fmt *sp, int *l)
 {
-    int	c;
+    int c;
 
     if (sp->minus)
     {
@@ -2160,9 +2195,9 @@ static int	ft_unum_out(unsigned int n, t_fmt *sp, int *l)
     return (c + ft_write_unum(n, l[1] - l[0], l[0]));
 }
 
-int	ft_print_unsigned(unsigned int n, t_fmt *spec)
+int ft_print_unsigned(unsigned int n, t_fmt *spec)
 {
-    int	l[2];
+    int l[2];
 
     l[0] = ft_unum_len(n, n == 0 && spec->precision == 0);
     l[1] = l[0];
@@ -2173,6 +2208,7 @@ int	ft_print_unsigned(unsigned int n, t_fmt *spec)
 ```
 
 **Key Simplifications from Signed:**
+
 - No `l[2]` (no sign to add to total)
 - No `sign` parameter to helpers
 - `ft_write_unum` has only 3 parameters vs 4
@@ -2184,10 +2220,10 @@ int	ft_print_unsigned(unsigned int n, t_fmt *spec)
 **Structure:** 5 functions, handles `#` prefix and case variation
 
 ```c
-static int	ft_print_hex_digits(unsigned int n, char format)
+static int ft_print_hex_digits(unsigned int n, char format)
 {
-    int		count;
-    char	*hex;
+    int  count;
+    char *hex;
 
     count = 0;
     if (format == 'X')
@@ -2200,9 +2236,9 @@ static int	ft_print_hex_digits(unsigned int n, char format)
     return (count);
 }
 
-static int	ft_hex_len(unsigned int n, int prec_zero)
+static int ft_hex_len(unsigned int n, int prec_zero)
 {
-    int	len;
+    int len;
 
     if (prec_zero)
         return (0);
@@ -2217,9 +2253,9 @@ static int	ft_hex_len(unsigned int n, int prec_zero)
     return (len);
 }
 
-static int	ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
+static int ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
 {
-    int	c;
+    int c;
 
     c = 0;
     if (sp->hash && n != 0)
@@ -2233,10 +2269,10 @@ static int	ft_write_hex(unsigned int n, t_fmt *sp, int prec_pad, int dlen)
     return (c);
 }
 
-static int	ft_hex_out(unsigned int n, t_fmt *sp, int *l)
+static int ft_hex_out(unsigned int n, t_fmt *sp, int *l)
 {
-    int	c;
-    int	plen;
+    int c;
+    int plen;
 
     plen = 0;
     if (sp->hash && n != 0)
@@ -2255,9 +2291,9 @@ static int	ft_hex_out(unsigned int n, t_fmt *sp, int *l)
     return (c + ft_write_hex(n, sp, l[1] - l[0], l[0]));
 }
 
-int	ft_print_hex(unsigned int n, t_fmt *spec)
+int ft_print_hex(unsigned int n, t_fmt *spec)
 {
-    int	l[2];
+    int l[2];
 
     l[0] = ft_hex_len(n, n == 0 && spec->precision == 0);
     l[1] = l[0];
@@ -2268,11 +2304,12 @@ int	ft_print_hex(unsigned int n, t_fmt *spec)
 ```
 
 **Hex-Specific Variables:**
-| Variable | Purpose |
-|----------|---------|
-| `plen` | Prefix length: 0 or 2 (for "0x"/"0X") |
-| `format` | The specifier character ('x' or 'X') |
-| `hex` | Lookup table for digit conversion |
+
+| Variable | Purpose                               |
+| -------- | ------------------------------------- |
+| `plen`   | Prefix length: 0 or 2 (for "0x"/"0X") |
+| `format` | The specifier character ('x' or 'X')  |
+| `hex`    | Lookup table for digit conversion     |
 
 ---
 
@@ -2297,6 +2334,7 @@ For any handler that needs the three-path pattern:
    - Sets up the `l[]` array
    - Calculates sign/prefix if needed
    - Calls the dispatcher
+
 - `ft_print_nil`: 19 lines ✓
 - `ft_print_ptr_addr`: 17 lines ✓
 - `ft_print_ptr`: 8 lines ✓
@@ -2331,12 +2369,12 @@ SRCS = ft_printf.c ft_parse_format.c ft_print_char.c ft_print_str.c \
 
 ### Refactoring Summary
 
-| Original File | Original Lines | New Files | Max Function Lines |
-|---------------|----------------|-----------|-------------------|
-| `ft_print_nbr.c` | 46 | `ft_print_nbr.c`, `ft_print_nbr_utils.c` | 15 |
-| `ft_print_unsigned.c` | 41 | `ft_print_unsigned.c` | 22 |
-| `ft_print_hex.c` | 39 | `ft_print_hex.c`, `ft_print_hex_utils.c` | 14 |
-| `ft_print_ptr.c` | 26 | `ft_print_ptr.c` | 19 |
+| Original File         | Original Lines | New Files                                | Max Function Lines |
+| --------------------- | -------------- | ---------------------------------------- | ------------------ |
+| `ft_print_nbr.c`      | 46             | `ft_print_nbr.c`, `ft_print_nbr_utils.c` | 15                 |
+| `ft_print_unsigned.c` | 41             | `ft_print_unsigned.c`                    | 22                 |
+| `ft_print_hex.c`      | 39             | `ft_print_hex.c`, `ft_print_hex_utils.c` | 14                 |
+| `ft_print_ptr.c`      | 26             | `ft_print_ptr.c`                         | 19                 |
 
 All functions are now under the 25-line limit, and all files have 5 or fewer functions.
 
@@ -2539,6 +2577,7 @@ print(get_second_element());
 ```
 
 This fails because:
+
 1. Different elements exist in different paths (precision zeros vs padding zeros)
 2. The same element (like sign) appears at different positions
 3. Conditional logic would be equally complex but harder to follow
@@ -2565,6 +2604,7 @@ else
 ```
 
 The lookup table:
+
 1. Has no branches (better CPU pipeline utilization)
 2. Is more compact
 3. Makes case handling trivial (just change the string)
@@ -2578,6 +2618,7 @@ unsigned long addr = (unsigned long)ptr;
 ```
 
 On most 64-bit systems:
+
 - `void *` is 64 bits
 - `unsigned int` is 32 bits (too small!)
 - `unsigned long` is 64 bits (sufficient)
@@ -2587,6 +2628,7 @@ Using `unsigned int` would truncate addresses, printing wrong values.
 #### The (nil) vs 0x0 Decision
 
 Different systems handle NULL differently:
+
 - Linux/glibc: "(nil)"
 - macOS: "0x0"
 - Some systems: "(null)" or just "0"
@@ -2598,6 +2640,7 @@ Our choice of "(nil)" matches Linux behavior, which is common in 42 School envir
 #### Stack Usage
 
 Each recursive call uses stack space. Maximum depths:
+
 - Decimal (long): 19 digits → 19 stack frames
 - Hexadecimal (unsigned int): 8 digits → 8 stack frames
 - Pointer hex (unsigned long): 16 digits → 16 stack frames
