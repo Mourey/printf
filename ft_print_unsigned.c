@@ -12,21 +12,6 @@
 
 #include "ft_printf.h"
 
-static int	ft_unum_len(unsigned int n)
-{
-	int	len;
-
-	len = 0;
-	if (n == 0)
-		return (1);
-	while (n > 0)
-	{
-		len++;
-		n /= 10;
-	}
-	return (len);
-}
-
 static int	ft_print_udigits(unsigned int n)
 {
 	int	count;
@@ -38,45 +23,58 @@ static int	ft_print_udigits(unsigned int n)
 	return (count);
 }
 
+static int	ft_unum_len(unsigned int n, int prec_zero)
+{
+	int	len;
+
+	if (prec_zero)
+		return (0);
+	len = 0;
+	if (n == 0)
+		return (1);
+	while (n > 0)
+	{
+		len++;
+		n /= 10;
+	}
+	return (len);
+}
+
+static int	ft_write_unum(unsigned int n, int prec_pad, int digit_len)
+{
+	int	count;
+
+	count = ft_print_padding(prec_pad, '0');
+	if (digit_len > 0)
+		count += ft_print_udigits(n);
+	return (count);
+}
+
+static int	ft_unum_out(unsigned int n, t_fmt *sp, int *l)
+{
+	int	c;
+
+	if (sp->minus)
+	{
+		c = ft_write_unum(n, l[1] - l[0], l[0]);
+		return (c + ft_print_padding(sp->width - l[1], ' '));
+	}
+	if (sp->zero && sp->precision < 0)
+	{
+		c = ft_print_padding(sp->width - l[1], '0');
+		return (c + ft_write_unum(n, l[1] - l[0], l[0]));
+	}
+	c = ft_print_padding(sp->width - l[1], ' ');
+	return (c + ft_write_unum(n, l[1] - l[0], l[0]));
+}
+
 int	ft_print_unsigned(unsigned int n, t_fmt *spec)
 {
-	int		count;
-	int		digit_len;
-	int		num_len;
-	int		total_len;
-	char	pad;
+	int	l[2];
 
-	count = 0;
-	digit_len = ft_unum_len(n);
-	if (n == 0 && spec->precision == 0)
-		digit_len = 0;
-	num_len = digit_len;
-	if (spec->precision > digit_len)
-		num_len = spec->precision;
-	total_len = num_len;
-	pad = ' ';
-	if (spec->zero && !spec->minus && spec->precision < 0)
-		pad = '0';
-	if (spec->minus)
-	{
-		count += ft_print_padding(num_len - digit_len, '0');
-		if (!(n == 0 && spec->precision == 0))
-			count += ft_print_udigits(n);
-		count += ft_print_padding(spec->width - total_len, ' ');
-	}
-	else if (pad == '0')
-	{
-		count += ft_print_padding(spec->width - total_len, '0');
-		count += ft_print_padding(num_len - digit_len, '0');
-		if (!(n == 0 && spec->precision == 0))
-			count += ft_print_udigits(n);
-	}
-	else
-	{
-		count += ft_print_padding(spec->width - total_len, ' ');
-		count += ft_print_padding(num_len - digit_len, '0');
-		if (!(n == 0 && spec->precision == 0))
-			count += ft_print_udigits(n);
-	}
-	return (count);
+	l[0] = ft_unum_len(n, n == 0 && spec->precision == 0);
+	l[1] = l[0];
+	if (spec->precision > l[0])
+		l[1] = spec->precision;
+	return (ft_unum_out(n, spec, l));
 }
