@@ -40,29 +40,6 @@ static int	ft_print_ptr_hex(unsigned long n)
 	return (count);
 }
 
-static int	ft_print_nil(int width, int minus)
-{
-	int	count;
-	int	i;
-
-	count = 0;
-	if (minus)
-	{
-		i = 0;
-		while (i++ < 5)
-			count += ft_putchar_count("(nil)"[i - 1]);
-		count += ft_print_padding(width - 5, ' ');
-	}
-	else
-	{
-		count += ft_print_padding(width - 5, ' ');
-		i = 0;
-		while (i++ < 5)
-			count += ft_putchar_count("(nil)"[i - 1]);
-	}
-	return (count);
-}
-
 int	ft_print_ptr(void *ptr, t_fmt *spec)
 {
 	int				count;
@@ -71,8 +48,6 @@ int	ft_print_ptr(void *ptr, t_fmt *spec)
 
 	count = 0;
 	addr = (unsigned long)ptr;
-	if (!ptr)
-		return (ft_print_nil(spec->width, spec->minus));
 	total_len = ft_ptr_len(addr) + 2;
 	if (spec->minus)
 	{
