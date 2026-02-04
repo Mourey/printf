@@ -1,32 +1,24 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_print_utils.c                                   :+:      :+:    :+:   */
+/*   test.c                                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rmourey- <rmourey-@student.42madrid.com>   +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/01/27 12:30:00 by rmourey-          #+#    #+#             */
-/*   Updated: 2026/02/04 11:38:24 by rmourey-         ###   ########.fr       */
+/*   Created: 2026/02/04 11:32:16 by rmourey-          #+#    #+#             */
+/*   Updated: 2026/02/04 11:35:53 by rmourey-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ft_printf.h"
 
-int	ft_putchar_count(char c)
-{
-	write(1, &c, 1);
-	return (1);
-}
-
-int	ft_print_padding(int n, char c)
+static int	ft_print_digits(long n)
 {
 	int	count;
 
 	count = 0;
-	while (n > 0)
-	{
-		count += ft_putchar_count(c);
-		n--;
-	}
+	if (n >= 10)
+		count += ft_print_digits(n / 10);
+	count += ft_putchar_count('0' + (n % 10));
 	return (count);
 }
