@@ -12,20 +12,7 @@
 
 #include "ft_printf.h"
 
-int	ft_print_char(char c, t_fmt *spec)
+int	ft_print_char(char c)
 {
-	int	count;
-
-	count = 0;
-	if (spec->minus)
-	{
-		count += ft_putchar_count(c);
-		count += ft_print_padding(spec->width - 1, ' ');
-	}
-	else
-	{
-		count += ft_print_padding(spec->width - 1, ' ');
-		count += ft_putchar_count(c);
-	}
-	return (count);
+	return (ft_putchar_count(c));
 }

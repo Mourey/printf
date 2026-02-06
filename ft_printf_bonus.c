@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_printf.c                                        :+:      :+:    :+:   */
+/*   ft_printf_bonus.c                                  :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rmourey- <rmourey-@student.42madrid.com>   +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,27 +10,27 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ft_printf.h"
+#include "ft_printf_bonus.h"
 
-static int	ft_dispatch(char specifier, va_list *args)
+static int	ft_dispatch(t_fmt *spec, va_list *args)
 {
 	int	count;
 
 	count = 0;
-	if (specifier == 'c')
-		count = ft_print_char((char)va_arg(*args, int));
-	else if (specifier == 's')
-		count = ft_print_str(va_arg(*args, char *));
-	else if (specifier == 'p')
-		count = ft_print_ptr(va_arg(*args, void *));
-	else if (specifier == 'd' || specifier == 'i')
-		count = ft_print_nbr(va_arg(*args, int));
-	else if (specifier == 'u')
-		count = ft_print_unsigned(va_arg(*args, unsigned int));
-	else if (specifier == 'x' || specifier == 'X')
-		count = ft_print_hex(va_arg(*args, unsigned int), specifier);
-	else if (specifier == '%')
-		count = ft_print_char('%');
+	if (spec->specifier == 'c')
+		count = ft_print_char((char)va_arg(*args, int), spec);
+	else if (spec->specifier == 's')
+		count = ft_print_str(va_arg(*args, char *), spec);
+	else if (spec->specifier == 'p')
+		count = ft_print_ptr(va_arg(*args, void *), spec);
+	else if (spec->specifier == 'd' || spec->specifier == 'i')
+		count = ft_print_nbr(va_arg(*args, int), spec);
+	else if (spec->specifier == 'u')
+		count = ft_print_unsigned(va_arg(*args, unsigned int), spec);
+	else if (spec->specifier == 'x' || spec->specifier == 'X')
+		count = ft_print_hex(va_arg(*args, unsigned int), spec);
+	else if (spec->specifier == '%')
+		count = ft_print_char('%', spec);
 	return (count);
 }
 
@@ -39,6 +39,7 @@ int	ft_printf(const char *format, ...)
 	va_list	args;
 	int		i;
 	int		count;
+	t_fmt	spec;
 
 	if (!format)
 		return (-1);
@@ -47,10 +48,10 @@ int	ft_printf(const char *format, ...)
 	count = 0;
 	while (format[i])
 	{
-		if (format[i] == '%' && format[i + 1])
+		if (format[i] == '%')
 		{
-			i++;
-			count += ft_dispatch(format[i], &args);
+			if (ft_parse_format(format, &i, &spec))
+				count += ft_dispatch(&spec, &args);
 		}
 		else
 			count += ft_putchar_count(format[i]);

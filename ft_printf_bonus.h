@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_printf.h                                        :+:      :+:    :+:   */
+/*   ft_printf_bonus.h                                  :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rmourey- <rmourey-@student.42madrid.com>   +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,19 +10,33 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef FT_PRINTF_H
-# define FT_PRINTF_H
+#ifndef FT_PRINTF_BONUS_H
+# define FT_PRINTF_BONUS_H
 
 # include "libft/libft.h"
 # include <stdarg.h>
 
+typedef struct s_fmt
+{
+	int		minus;
+	int		zero;
+	int		hash;
+	int		space;
+	int		plus;
+	int		width;
+	int		precision;
+	char	specifier;
+}	t_fmt;
+
 int		ft_printf(const char *format, ...);
-int		ft_print_char(char c);
-int		ft_print_str(char *s);
-int		ft_print_ptr(void *ptr);
-int		ft_print_nbr(int n);
-int		ft_print_unsigned(unsigned int n);
-int		ft_print_hex(unsigned int n, char format);
+int		ft_parse_format(const char *fmt, int *i, t_fmt *spec);
+int		ft_print_char(char c, t_fmt *spec);
+int		ft_print_str(char *s, t_fmt *spec);
+int		ft_print_ptr(void *ptr, t_fmt *spec);
+int		ft_print_nbr(int n, t_fmt *spec);
+int		ft_print_unsigned(unsigned int n, t_fmt *spec);
+int		ft_print_hex(unsigned int n, t_fmt *spec);
 int		ft_putchar_count(char c);
+int		ft_print_padding(int n, char c);
 
 #endif

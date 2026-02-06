@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_print_str.c                                     :+:      :+:    :+:   */
+/*   ft_print_char_bonus.c                              :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rmourey- <rmourey-@student.42madrid.com>   +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,21 +10,22 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ft_printf.h"
+#include "ft_printf_bonus.h"
 
-int	ft_print_str(char *s)
+int	ft_print_char(char c, t_fmt *spec)
 {
 	int	count;
-	int	i;
 
-	if (!s)
-		s = "(null)";
 	count = 0;
-	i = 0;
-	while (s[i])
+	if (spec->minus)
 	{
-		count += ft_putchar_count(s[i]);
-		i++;
+		count += ft_putchar_count(c);
+		count += ft_print_padding(spec->width - 1, ' ');
+	}
+	else
+	{
+		count += ft_print_padding(spec->width - 1, ' ');
+		count += ft_putchar_count(c);
 	}
 	return (count);
 }

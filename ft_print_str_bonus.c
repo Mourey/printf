@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_print_str.c                                     :+:      :+:    :+:   */
+/*   ft_print_str_bonus.c                               :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rmourey- <rmourey-@student.42madrid.com>   +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,21 +10,45 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ft_printf.h"
+#include "ft_printf_bonus.h"
 
-int	ft_print_str(char *s)
+static int	ft_print_str_content(char *s, int len)
 {
 	int	count;
 	int	i;
 
-	if (!s)
-		s = "(null)";
 	count = 0;
 	i = 0;
-	while (s[i])
+	while (i < len)
 	{
 		count += ft_putchar_count(s[i]);
 		i++;
+	}
+	return (count);
+}
+
+int	ft_print_str(char *s, t_fmt *spec)
+{
+	int	count;
+	int	len;
+	int	print_len;
+
+	count = 0;
+	if (!s)
+		s = "(null)";
+	len = ft_strlen(s);
+	print_len = len;
+	if (spec->precision >= 0 && spec->precision < len)
+		print_len = spec->precision;
+	if (spec->minus)
+	{
+		count += ft_print_str_content(s, print_len);
+		count += ft_print_padding(spec->width - print_len, ' ');
+	}
+	else
+	{
+		count += ft_print_padding(spec->width - print_len, ' ');
+		count += ft_print_str_content(s, print_len);
 	}
 	return (count);
 }
